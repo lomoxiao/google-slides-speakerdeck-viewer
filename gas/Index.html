@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Slide Library - Google Slides Viewer</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <main class="app">
+    <section id="galleryView" class="gallery-view is-visible" aria-labelledby="galleryTitle">
+      <div class="shell">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Google Slides Viewer</p>
+            <h1 id="galleryTitle">Slide Library</h1>
+            <p class="subtitle">Drive 上の Google Slides を探して読みやすく表示するビューアです。</p>
+          </div>
+        </header>
+
+        <form id="generationForm" class="generation-panel" novalidate>
+          <label class="generation-box" for="articleUrlInput">
+            <span>Article URL</span>
+            <input id="articleUrlInput" type="url" placeholder="https://example.com/article" autocomplete="url">
+          </label>
+          <button id="generationButton" class="primary-button" type="submit">逕滓・縺吶ｋ</button>
+          <p id="generationMessage" class="form-message" aria-live="polite"></p>
+        </form>
+
+        <div class="search-panel">
+          <label class="search-box" for="searchInput">
+            <span aria-hidden="true">Search</span>
+            <input id="searchInput" type="search" placeholder="繧ｿ繧､繝医Ν縺ｧ讀懃ｴ｢" autocomplete="off">
+          </label>
+        </div>
+
+        <div id="loadingState" class="status is-visible" role="status" aria-live="polite">
+          <div>
+            <div class="loader" aria-hidden="true"></div>
+            <strong>Loading slides</strong>
+            <span>Preparing the Google Slides library.</span>
+          </div>
+        </div>
+
+        <div id="errorState" class="status" role="alert"></div>
+        <div id="emptyState" class="status"></div>
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="viewerView" class="viewer" aria-labelledby="viewerTitle">
+      <div class="shell">
+        <header class="viewer-head">
+          <button class="ghost-button" type="button" onclick="showGallery()">Back</button>
+          <div class="viewer-title">
+            <h2 id="viewerTitle"></h2>
+            <p id="pageIndicator"></p>
+            <p id="sourceLink" class="source-link"></p>
+          </div>
+          <button id="fullscreenButton" class="ghost-button" type="button" onclick="toggleViewerFullscreen()">&#20840;&#30011;&#38754;</button>
+        </header>
+
+        <div class="viewer-grid">
+          <div class="stage-wrap">
+            <div class="stage">
+              <button id="prevButton" class="nav-button" type="button" onclick="prevPage()" aria-label="Previous page">&lsaquo;</button>
+              <div id="slideFrame" class="slide-frame"></div>
+              <button id="nextButton" class="nav-button" type="button" onclick="nextPage()" aria-label="Next page">&rsaquo;</button>
+            </div>
+            <div id="pageStrip" class="page-strip" aria-label="繝壹・繧ｸ繧ｵ繝繝阪う繝ｫ荳隕ｧ"></div>
+          </div>
+
+          <aside class="viewer-side" aria-label="Speaker notes">
+            <h3>Speaker Notes</h3>
+            <div id="speakerNoteContent" class="note-content"></div>
+          </aside>
+        </div>
+        <div id="viewerToast" class="viewer-toast" role="status" aria-live="polite" hidden></div>
+      </div>
+    </section>
+  </main>
+  <?!= include('Script'); ?>
+</body>
+</html>

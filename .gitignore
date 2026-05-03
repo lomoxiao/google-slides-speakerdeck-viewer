@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.clasp.json
+appsscript.json
+credentials.json
+token.json
+google-service-account.json
+google-oauth-credentials.json
+google-oauth-token.json
