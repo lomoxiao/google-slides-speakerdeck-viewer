@@ -47,7 +47,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -82,6 +83,11 @@ img {
   margin-bottom: 24px;
 }
 
+.generation-toggle {
+  flex: 0 0 auto;
+  margin-bottom: 4px;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--muted);
@@ -106,19 +112,93 @@ h1 {
 }
 
 .generation-panel {
+  overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-  margin-bottom: 18px;
-  padding: 16px;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 8px 24px rgba(31, 35, 40, 0.04);
+  animation: accordionDown 180ms ease-out;
 }
 
-.generation-box,
+.generation-panel[hidden] {
+  display: none;
+}
+
+@keyframes accordionDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.generation-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+
+.generation-head h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.generation-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.mode-tab {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mode-tab.is-active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.field-grid,
+.option-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.option-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+}
+
+.option-focus {
+  grid-column: 1 / -1;
+}
+
+.field-box,
 .search-box {
   display: flex;
   align-items: center;
@@ -130,14 +210,20 @@ h1 {
   background: rgba(255, 255, 255, 0.92);
 }
 
-.generation-box span,
+.field-box.is-textarea {
+  align-items: flex-start;
+  border-radius: var(--radius-lg);
+}
+
+.field-box span,
 .search-box span {
   flex: 0 0 auto;
   color: var(--muted-light);
   font-size: 14px;
 }
 
-.generation-box input,
+.field-box input,
+.field-box textarea,
 .search-box input {
   width: 100%;
   min-width: 0;
@@ -146,6 +232,16 @@ h1 {
   color: var(--ink);
   background: transparent;
   font-size: 16px;
+}
+
+.field-box textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.generation-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .primary-button {
@@ -163,7 +259,6 @@ h1 {
 }
 
 .form-message {
-  grid-column: 1 / -1;
   min-height: 18px;
   margin: -2px 4px 0;
   color: var(--muted);
@@ -178,6 +273,10 @@ h1 {
   position: sticky;
   top: 0;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 14px 0 22px;
   margin-bottom: 8px;
   background: linear-gradient(180deg, rgba(246, 247, 248, 0.96), rgba(246, 247, 248, 0.78));
@@ -187,6 +286,13 @@ h1 {
 .search-box {
   width: min(100%, 560px);
   box-shadow: 0 8px 24px rgba(31, 35, 40, 0.05);
+}
+
+.gallery-page-indicator {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .status {
@@ -231,8 +337,8 @@ h1 {
 
 .gallery {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .slide-card,
@@ -258,6 +364,30 @@ h1 {
 
 .pending-card {
   border-style: dashed;
+}
+
+.slide-card.is-featured,
+.pending-card.is-featured {
+  grid-column: 1 / -1;
+}
+
+.slide-card.is-featured {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+  align-items: stretch;
+}
+
+.slide-card.is-featured .card-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 22px;
+}
+
+.slide-card.is-featured .card-title {
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .card-thumb {
@@ -319,6 +449,20 @@ h1 {
   gap: 12px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.gallery-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gallery-pager[hidden] {
+  display: none;
 }
 
 .viewer,
@@ -613,10 +757,6 @@ body.viewer-fullscreen .note-content {
 }
 
 @media (max-width: 1100px) {
-  .gallery {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .viewer-grid {
     grid-template-columns: 1fr;
   }
@@ -632,9 +772,28 @@ body.viewer-fullscreen .note-content {
   }
 
   .topbar,
-  .viewer-head,
-  .generation-panel {
+  .viewer-head {
     display: block;
+  }
+
+  .generation-toggle {
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  .generation-head,
+  .option-grid,
+  .slide-card.is-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-tabs {
+    width: 100%;
+  }
+
+  .mode-tab {
+    flex: 1 1 0;
+    padding-inline: 8px;
   }
 
   .primary-button {
@@ -657,7 +816,12 @@ body.viewer-fullscreen .note-content {
 
   .search-panel {
     position: static;
+    display: block;
     padding-top: 6px;
+  }
+
+  .gallery-page-indicator {
+    margin-top: 10px;
   }
 
   .stage {
@@ -676,6 +840,11 @@ body.viewer-fullscreen .note-content {
 @media (max-width: 932px) {
   .gallery {
     grid-template-columns: 1fr;
+  }
+
+  .slide-card.is-featured,
+  .pending-card.is-featured {
+    grid-column: auto;
   }
 }
 
@@ -1060,42 +1229,101 @@ body.viewer-fullscreen-unavailable.viewer-immersive .viewer.is-visible {
             <h1 id="galleryTitle">Slide Library</h1>
             <p class="subtitle">Drive 上の Google Slides を探して読みやすく表示するビューアです。</p>
           </div>
+          <button
+            id="generationToggle"
+            class="ghost-button generation-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="generationPanel"
+          >スライド生成</button>
         </header>
 
-        <form id="generationForm" class="generation-panel" novalidate>
-          <label class="generation-box" for="articleUrlInput">
-            <span>Article URL</span>
-            <input id="articleUrlInput" type="url" placeholder="https://example.com/article" autocomplete="url">
-          </label>
-          <button id="generationButton" class="primary-button" type="submit">逕滓・縺吶ｋ</button>
+        <form id="generationPanel" class="generation-panel" novalidate hidden>
+          <div class="generation-head">
+            <div>
+              <h2>スライド生成</h2>
+              <p>URLまたは調査プロンプトから、Google Slides生成ジョブを依頼します。</p>
+            </div>
+            <div class="mode-tabs" role="tablist" aria-label="生成モード">
+              <button id="urlModeButton" class="mode-tab is-active" type="button" role="tab" aria-selected="true" data-mode="url">URLから生成</button>
+              <button id="researchModeButton" class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="research">リサーチから生成</button>
+            </div>
+          </div>
+
+          <div id="urlFields" class="field-grid">
+            <label class="field-box" for="urlInput1">
+              <span>URL 1</span>
+              <input id="urlInput1" type="url" placeholder="https://example.com/article" autocomplete="url">
+            </label>
+            <label class="field-box" for="urlInput2">
+              <span>URL 2</span>
+              <input id="urlInput2" type="url" placeholder="任意: https://example.com/report" autocomplete="off">
+            </label>
+            <label class="field-box" for="urlInput3">
+              <span>URL 3</span>
+              <input id="urlInput3" type="url" placeholder="任意: https://example.com/source" autocomplete="off">
+            </label>
+          </div>
+
+          <div id="researchFields" class="field-grid" hidden>
+            <label class="field-box is-textarea" for="researchPromptInput">
+              <span>調査プロンプト</span>
+              <textarea id="researchPromptInput" rows="4" placeholder="例: 生成AIエージェント市場の最新動向を調査し、日本企業への影響を中心に整理してください。"></textarea>
+            </label>
+          </div>
+
+          <div class="option-grid">
+            <label class="field-box" for="audienceInput">
+              <span>対象読者</span>
+              <input id="audienceInput" type="text" placeholder="例: 経営層、開発者、営業向け" autocomplete="off">
+            </label>
+            <label class="field-box" for="pagesInput">
+              <span>目標スライド数</span>
+              <input id="pagesInput" type="number" min="1" step="1" inputmode="numeric" placeholder="例: 8">
+            </label>
+            <label class="field-box option-focus" for="focusInput">
+              <span>重点テーマ</span>
+              <input id="focusInput" type="text" placeholder="例: 日本市場への影響を中心に" autocomplete="off">
+            </label>
+          </div>
+
+          <div class="generation-actions">
+            <button id="generationButton" class="primary-button" type="submit">生成を依頼</button>
+          </div>
           <p id="generationMessage" class="form-message" aria-live="polite"></p>
         </form>
 
         <div class="search-panel">
           <label class="search-box" for="searchInput">
-            <span aria-hidden="true">Search</span>
-            <input id="searchInput" type="search" placeholder="繧ｿ繧､繝医Ν縺ｧ讀懃ｴ｢" autocomplete="off">
+            <span aria-hidden="true">検索</span>
+            <input id="searchInput" type="search" placeholder="タイトルで検索" autocomplete="off">
           </label>
+          <p id="galleryPageIndicator" class="gallery-page-indicator"></p>
         </div>
 
         <div id="loadingState" class="status is-visible" role="status" aria-live="polite">
           <div>
             <div class="loader" aria-hidden="true"></div>
-            <strong>Loading slides</strong>
-            <span>Preparing the Google Slides library.</span>
+            <strong>スライドを読み込んでいます</strong>
+            <span>Google Slidesライブラリを準備しています。</span>
           </div>
         </div>
 
         <div id="errorState" class="status" role="alert"></div>
         <div id="emptyState" class="status"></div>
         <div id="gallery" class="gallery" aria-live="polite"></div>
+        <nav id="galleryPager" class="gallery-pager" aria-label="スライド一覧ページ送り" hidden>
+          <button id="galleryPrevButton" class="ghost-button" type="button">前へ</button>
+          <span id="galleryPagerText"></span>
+          <button id="galleryNextButton" class="ghost-button" type="button">次へ</button>
+        </nav>
       </div>
     </section>
 
     <section id="viewerView" class="viewer" aria-labelledby="viewerTitle">
       <div class="shell">
         <header class="viewer-head">
-          <button class="ghost-button" type="button" onclick="showGallery()">Back</button>
+          <button class="ghost-button" type="button" onclick="showGallery()">戻る</button>
           <div class="viewer-title">
             <h2 id="viewerTitle"></h2>
             <p id="pageIndicator"></p>
@@ -1111,7 +1339,7 @@ body.viewer-fullscreen-unavailable.viewer-immersive .viewer.is-visible {
               <div id="slideFrame" class="slide-frame"></div>
               <button id="nextButton" class="nav-button" type="button" onclick="nextPage()" aria-label="Next page">&rsaquo;</button>
             </div>
-            <div id="pageStrip" class="page-strip" aria-label="繝壹・繧ｸ繧ｵ繝繝阪う繝ｫ荳隕ｧ"></div>
+            <div id="pageStrip" class="page-strip" aria-label="ページサムネイル一覧"></div>
           </div>
 
           <aside class="viewer-side" aria-label="Speaker notes">
@@ -1126,6 +1354,7 @@ body.viewer-fullscreen-unavailable.viewer-immersive .viewer.is-visible {
   <script>
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
+const GALLERY_PAGE_SIZE = 3;
 
 const state = {
   presentations: [],
@@ -1144,6 +1373,9 @@ const state = {
   pageWindowRequests: {},
   prefetchQueue: {},
   isPrefetching: false,
+  generationMode: "url",
+  isGenerationPanelOpen: false,
+  galleryPageIndex: 0,
   controlsIdleTimer: null,
   toastTimer: null,
   fullscreenRequestId: 0
@@ -1166,7 +1398,23 @@ function bindEvents() {
     filterPresentations(event.target.value);
   });
 
-  document.getElementById("generationForm").addEventListener("submit", function(event) {
+  document.getElementById("generationToggle").addEventListener("click", toggleGenerationPanel);
+
+  document.querySelectorAll(".mode-tab").forEach(function(button) {
+    button.addEventListener("click", function() {
+      setGenerationMode(button.dataset.mode || "url");
+    });
+  });
+
+  document.getElementById("galleryPrevButton").addEventListener("click", function() {
+    changeGalleryPage(-1);
+  });
+
+  document.getElementById("galleryNextButton").addEventListener("click", function() {
+    changeGalleryPage(1);
+  });
+
+  document.getElementById("generationPanel").addEventListener("submit", function(event) {
     event.preventDefault();
     requestGeneration();
   });
@@ -1244,6 +1492,7 @@ function loadPresentations() {
 function setPresentations(presentations) {
   state.presentations = sortPresentations(presentations || []);
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+  state.galleryPageIndex = 0;
   state.knownIds = new Set(state.presentations.map(function(presentation) {
     return presentation.id;
   }));
@@ -1256,51 +1505,161 @@ function renderGallery() {
   gallery.innerHTML = "";
   hideError();
 
-  state.pendingUrls.forEach(function(url) {
-    gallery.appendChild(createPendingCard(url));
+  const items = state.pendingUrls.concat(state.filteredPresentations);
+  const pageCount = getGalleryPageCount(items.length);
+  state.galleryPageIndex = Math.min(state.galleryPageIndex, Math.max(pageCount - 1, 0));
+  const start = state.galleryPageIndex * GALLERY_PAGE_SIZE;
+  const visibleItems = items.slice(start, start + GALLERY_PAGE_SIZE);
+
+  visibleItems.forEach(function(item, index) {
+    const displayRank = start + index;
+    if (typeof item === "string") {
+      gallery.appendChild(createPendingCard(item, displayRank));
+      return;
+    }
+    gallery.appendChild(createPresentationCard(item, displayRank));
   });
 
   if (!state.filteredPresentations.length && !state.pendingUrls.length) {
     showEmpty("表示できるスライドがありません", "検索条件を変えるか、Drive の対象フォルダを確認してください。");
+    renderGalleryPager(items.length);
     return;
   }
 
   hideEmpty();
+  renderGalleryPager(items.length);
+  hydrateGalleryThumbnails(visibleItems, true);
+  warmHiddenPresentationThumbnails(visibleItems);
+}
 
-  state.filteredPresentations.forEach(function(presentation) {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "slide-card";
-    card.onclick = function() {
-      openPresentation(presentation.id);
-    };
+function createPresentationCard(presentation, displayRank) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "slide-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
+  card.onclick = function() {
+    openPresentation(presentation.id);
+  };
 
-    card.innerHTML =
-      '<div class="card-thumb">' +
-        imageMarkup(presentation.thumbnailUrl, presentation.title) +
+  card.innerHTML =
+    '<div class="card-thumb">' +
+      imageMarkup(presentation.thumbnailUrl, presentation.title) +
+    '</div>' +
+    '<div class="card-body">' +
+      '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
+      '<div class="meta">' +
+        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
+        '<span>' + formatDate(presentation.updatedAt) + '</span>' +
       '</div>' +
-      '<div class="card-body">' +
-        '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
-        '<div class="meta">' +
-          '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + ' slides</span>' +
-          '<span>' + formatDate(presentation.updatedAt) + '</span>' +
-        '</div>' +
-      '</div>';
+    '</div>';
 
-    gallery.appendChild(card);
+  return card;
+}
+
+function getGalleryPageCount(total) {
+  return Math.max(1, Math.ceil(total / GALLERY_PAGE_SIZE));
+}
+
+function renderGalleryPager(total) {
+  const pager = document.getElementById("galleryPager");
+  const pagerText = document.getElementById("galleryPagerText");
+  const indicator = document.getElementById("galleryPageIndicator");
+  const pageCount = getGalleryPageCount(total);
+  const pageText = total
+    ? "Page " + (state.galleryPageIndex + 1) + " / " + pageCount
+    : "";
+
+  pager.hidden = total <= GALLERY_PAGE_SIZE;
+  pagerText.textContent = pageText;
+  indicator.textContent = pageText;
+  document.getElementById("galleryPrevButton").disabled = state.galleryPageIndex <= 0;
+  document.getElementById("galleryNextButton").disabled = state.galleryPageIndex >= pageCount - 1;
+}
+
+function changeGalleryPage(delta) {
+  const total = state.pendingUrls.length + state.filteredPresentations.length;
+  const pageCount = getGalleryPageCount(total);
+  state.galleryPageIndex = Math.max(0, Math.min(state.galleryPageIndex + delta, pageCount - 1));
+  renderGallery();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function warmHiddenPresentationThumbnails(visibleItems) {
+  if (!isGasRuntime()) return;
+  const visibleIds = new Set(visibleItems.filter(function(item) {
+    return typeof item !== "string";
+  }).map(function(item) {
+    return item.id;
+  }));
+  const missing = state.filteredPresentations.some(function(presentation) {
+    return !visibleIds.has(presentation.id) && !presentation.thumbnailUrl;
+  });
+  if (!missing) return;
+  window.setTimeout(function() {
+    if (isGasRuntime()) {
+      hydrateGalleryThumbnails(
+        state.filteredPresentations.filter(function(presentation) {
+          return !visibleIds.has(presentation.id) && !presentation.thumbnailUrl;
+        }),
+        false
+      );
+    }
+  }, 250);
+}
+
+function hydrateGalleryThumbnails(items, shouldRender) {
+  if (!isGasRuntime()) return;
+  const targets = items.filter(function(item) {
+    return typeof item !== "string" && item.id && !item.thumbnailUrl && !item.isThumbnailLoading;
+  });
+  targets.slice(0, shouldRender ? GALLERY_PAGE_SIZE : 6).forEach(function(presentation) {
+    presentation.isThumbnailLoading = true;
+    google.script.run
+      .withSuccessHandler(function(meta) {
+        presentation.isThumbnailLoading = false;
+        mergeSinglePresentationMeta(meta);
+        if (shouldRender) {
+          renderGallery();
+        } else {
+          scheduleRemainingThumbnailHydration();
+        }
+      })
+      .withFailureHandler(function() {
+        presentation.isThumbnailLoading = false;
+      })
+      .getPresentationFirstThumbnail(presentation.id);
   });
 }
 
-function createPendingCard(url) {
+function scheduleRemainingThumbnailHydration() {
+  window.setTimeout(function() {
+    hydrateGalleryThumbnails(
+      state.filteredPresentations.filter(function(presentation) {
+        return !presentation.thumbnailUrl;
+      }),
+      false
+    );
+  }, 250);
+}
+
+function mergeSinglePresentationMeta(meta) {
+  if (!meta || !meta.id) return;
+  state.presentations = state.presentations.map(function(item) {
+    if (item.id !== meta.id) return item;
+    return Object.assign({}, item, meta, { pages: item.pages || meta.pages || [] });
+  });
+  state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+}
+
+function createPendingCard(label, displayRank) {
   const card = document.createElement("article");
-  card.className = "pending-card";
+  card.className = "pending-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
   card.innerHTML =
     '<div class="card-thumb">' +
-      '<div class="pending-thumb"><div><div class="loader" aria-hidden="true"></div><strong>逕滓・荳ｭ...</strong></div></div>' +
+      '<div class="pending-thumb"><div><div class="loader" aria-hidden="true"></div><strong>生成中...</strong></div></div>' +
     '</div>' +
     '<div class="card-body">' +
-      '<h2 class="card-title">' + escapeHtml(url) + '</h2>' +
-      '<div class="meta"><span>Slack 縺ｫ萓晞ｼ貂医∩</span><span>蠕・ｩ滉ｸｭ</span></div>' +
+      '<h2 class="card-title">' + escapeHtml(label) + '</h2>' +
+      '<div class="meta"><span>Slackに依頼済み</span><span>待機中</span></div>' +
     '</div>';
   return card;
 }
@@ -1518,7 +1877,7 @@ function renderViewer() {
       loadPageWindow(presentation.id, state.currentPageIndex, INITIAL_PAGE_COUNT, true);
     }
   } else {
-    slideFrame.innerHTML = '<div class="image-fallback">繝壹・繧ｸ逕ｻ蜒上′縺ゅｊ縺ｾ縺帙ｓ</div>';
+    slideFrame.innerHTML = '<div class="image-fallback">ページ画像がありません</div>';
   }
 
   renderPageStrip();
@@ -1538,7 +1897,7 @@ function showViewerLoading() {
 function showViewerError(message) {
   document.getElementById("pageIndicator").textContent = "ページ読み込み失敗";
   document.getElementById("slideFrame").innerHTML =
-    '<div class="viewer-message is-error"><div><strong>繝壹・繧ｸ繧定ｪｭ縺ｿ霎ｼ繧√∪縺帙ｓ縺ｧ縺励◆</strong><span>' + escapeHtml(message) + '</span></div></div>';
+    '<div class="viewer-message is-error"><div><strong>ページを読み込めませんでした</strong><span>' + escapeHtml(message) + '</span></div></div>';
   document.getElementById("pageStrip").innerHTML = "";
   renderSpeakerNote("ページを読み込めなかったため、ノートを表示できません。");
 }
@@ -1596,7 +1955,7 @@ function renderSourceLink() {
     return;
   }
 
-  sourceLink.innerHTML = '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">蜈・ｨ倅ｺ九ｒ髢九￥</a>';
+  sourceLink.innerHTML = '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">元記事を開く</a>';
 }
 
 function goToPage(index) {
@@ -1620,6 +1979,7 @@ function prevPage() {
 
 function filterPresentations(keyword) {
   state.filteredPresentations = filterPresentationList(keyword);
+  state.galleryPageIndex = 0;
   renderGallery();
 }
 
@@ -1832,16 +2192,44 @@ function syncFullscreenButton() {
   button.textContent = isFullscreen ? "\u89e3\u9664" : "\u5168\u753b\u9762";
   button.setAttribute("aria-pressed", isFullscreen ? "true" : "false");
 }
+
+function toggleGenerationPanel() {
+  setGenerationPanelOpen(!state.isGenerationPanelOpen);
+}
+
+function setGenerationPanelOpen(isOpen) {
+  state.isGenerationPanelOpen = isOpen;
+  const panel = document.getElementById("generationPanel");
+  const toggle = document.getElementById("generationToggle");
+  panel.hidden = !isOpen;
+  toggle.textContent = isOpen ? "閉じる" : "スライド生成";
+  toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setGenerationMode(mode) {
+  state.generationMode = mode === "research" ? "research" : "url";
+  const isResearch = state.generationMode === "research";
+  document.getElementById("urlFields").hidden = isResearch;
+  document.getElementById("researchFields").hidden = !isResearch;
+  document.querySelectorAll(".mode-tab").forEach(function(button) {
+    const active = button.dataset.mode === state.generationMode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  setGenerationMessage("");
+}
+
 function requestGeneration() {
-  const input = document.getElementById("articleUrlInput");
-  const url = input.value.trim();
+  const payloadResult = collectGenerationPayload();
 
   setGenerationMessage("");
-  if (!/^https?:\/\/\S+/i.test(url)) {
-    setGenerationMessage("http:// または https:// で始まるURLを入力してください。", true);
+  if (!payloadResult.ok) {
+    setGenerationMessage(payloadResult.message, true);
     return;
   }
 
+  const payload = payloadResult.payload;
+  const pendingLabel = createPendingLabel(payload);
   setGenerationSubmitting(true);
 
   if (isGasRuntime()) {
@@ -1852,38 +2240,98 @@ function requestGeneration() {
           setGenerationMessage("生成依頼の送信に失敗しました。", true);
           return;
         }
-        onGenerationRequested(url);
+        onGenerationRequested(pendingLabel);
       })
       .withFailureHandler(function(error) {
         setGenerationSubmitting(false);
-        removePendingCard(url);
+        removePendingCard(pendingLabel);
         setGenerationMessage(error && error.message ? error.message : String(error), true);
       })
-      .requestSlideGeneration(url);
+      .requestSlideGeneration(payload);
     return;
   }
 
   window.setTimeout(function() {
-    onGenerationRequested(url);
+    onGenerationRequested(pendingLabel);
     window.setTimeout(function() {
-      completeLocalGeneration(url);
+      completeLocalGeneration(pendingLabel);
     }, 2500);
   }, 500);
 }
 
-function onGenerationRequested(url) {
+function collectGenerationPayload() {
+  const payload = {
+    mode: state.generationMode,
+    urls: [],
+    researchPrompt: "",
+    audience: document.getElementById("audienceInput").value.trim(),
+    focus: document.getElementById("focusInput").value.trim(),
+    pages: document.getElementById("pagesInput").value.trim()
+  };
+
+  if (state.generationMode === "research") {
+    payload.researchPrompt = document.getElementById("researchPromptInput").value.trim();
+    if (!payload.researchPrompt) {
+      return { ok: false, message: "調査プロンプトを入力してください。" };
+    }
+  } else {
+    payload.urls = [1, 2, 3].map(function(index) {
+      return document.getElementById("urlInput" + index).value.trim();
+    }).filter(Boolean);
+    if (!payload.urls.length) {
+      return { ok: false, message: "URLを1件以上入力してください。" };
+    }
+    if (payload.urls.length > 3) {
+      return { ok: false, message: "URLは最大3件まで指定できます。" };
+    }
+    if (payload.urls.some(function(url) { return !/^https?:\/\/\S+/i.test(url); })) {
+      return { ok: false, message: "URLは http:// または https:// で始まる形式で入力してください。" };
+    }
+  }
+
+  if (payload.pages && !/^\d+$/.test(payload.pages)) {
+    return { ok: false, message: "目標スライド数は整数で入力してください。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      urls: payload.urls,
+      researchPrompt: payload.researchPrompt,
+      audience: payload.audience,
+      focus: payload.focus,
+      pages: payload.pages ? Number(payload.pages) : undefined
+    }
+  };
+}
+
+function createPendingLabel(payload) {
+  if (payload.researchPrompt) {
+    return "リサーチ: " + payload.researchPrompt;
+  }
+  return payload.urls.join(", ");
+}
+
+function onGenerationRequested(label) {
   setGenerationSubmitting(false);
-  document.getElementById("articleUrlInput").value = "";
   setGenerationMessage("生成依頼を送信しました。");
-  addPendingCard(url);
+  clearGenerationInputs();
+  addPendingCard(label);
   startPolling();
+}
+
+function clearGenerationInputs() {
+  ["urlInput1", "urlInput2", "urlInput3", "researchPromptInput"].forEach(function(id) {
+    const node = document.getElementById(id);
+    if (node) node.value = "";
+  });
 }
 
 function setGenerationSubmitting(isSubmitting) {
   state.isRequestingGeneration = isSubmitting;
   const button = document.getElementById("generationButton");
   button.disabled = isSubmitting;
-  button.textContent = isSubmitting ? "騾∽ｿ｡荳ｭ..." : "逕滓・縺吶ｋ";
+  button.textContent = isSubmitting ? "送信中..." : "生成を依頼";
 }
 
 function setGenerationMessage(message, isError) {
@@ -1896,6 +2344,7 @@ function addPendingCard(url) {
   if (state.pendingUrls.indexOf(url) === -1) {
     state.pendingUrls.unshift(url);
   }
+  state.galleryPageIndex = 0;
   renderGallery();
 }
 
@@ -1948,8 +2397,12 @@ function mergePresentationMeta(presentations) {
     const existing = state.presentations.find(function(item) {
       return item.id === meta.id;
     });
-    return existing && existing.pages && existing.pages.length
-      ? Object.assign({}, meta, { pages: existing.pages })
+    return existing
+      ? Object.assign({}, meta, {
+          thumbnailUrl: meta.thumbnailUrl || existing.thumbnailUrl || "",
+          thumbnailFetchedAt: meta.thumbnailFetchedAt || existing.thumbnailFetchedAt || "",
+          pages: existing.pages && existing.pages.length ? existing.pages : meta.pages
+        })
       : meta;
   });
 
@@ -1969,6 +2422,7 @@ function mergePresentationMeta(presentations) {
   });
 
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+  state.galleryPageIndex = 0;
   renderGallery();
   if (!state.pendingUrls.length) {
     stopPolling();
@@ -1994,7 +2448,7 @@ function showLoading(isVisible) {
 
 function showError(message) {
   const errorState = document.getElementById("errorState");
-  errorState.innerHTML = '<div><strong>隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆</strong><span>' + escapeHtml(message) + '</span></div>';
+  errorState.innerHTML = '<div><strong>読み込みに失敗しました</strong><span>' + escapeHtml(message) + '</span></div>';
   errorState.classList.add("is-visible");
 }
 
@@ -2013,14 +2467,14 @@ function hideEmpty() {
 }
 
 function imageMarkup(src, alt) {
-  if (!src) return '<div class="image-fallback">逕ｻ蜒上ｒ陦ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ</div>';
+  if (!src) return '<div class="image-fallback">画像を表示できません</div>';
   return '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '" loading="lazy" onerror="this.replaceWith(createImageFallback())">';
 }
 
 function createImageFallback() {
   const fallback = document.createElement("div");
   fallback.className = "image-fallback";
-  fallback.textContent = "逕ｻ蜒上ｒ陦ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ";
+  fallback.textContent = "画像を表示できません";
   return fallback;
 }
 
@@ -2111,3 +2565,4 @@ document.addEventListener("DOMContentLoaded", init);
 
 </body>
 </html>
+

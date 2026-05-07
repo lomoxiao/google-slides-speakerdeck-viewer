@@ -67,6 +67,7 @@ Apps Script エディタで `installWarmPresentationsTrigger()` を一度手動�
 
 - GASから `/slides URL` を投稿してもSlash Commandは発火しません。
 - Viewerからは `[slide-generate] URL` をSlackへ投稿します。
+- 複数URLを指定する場合は、Slackの自動リンク化でURL同士が結合されないように `, `（カンマ + 半角スペース）区切りで投稿します。
 - `article-to-slides-automation` 側のSocket Modeがこのメッセージを拾ってローカルCodex処理を起動します。
 - このプロジェクトでは `article-to-slides-automation` 側の実装は行いません。
 

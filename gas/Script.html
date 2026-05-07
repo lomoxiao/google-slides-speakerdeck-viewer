@@ -1,6 +1,7 @@
 ﻿<script>
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
+const GALLERY_PAGE_SIZE = 3;
 
 const state = {
   presentations: [],
@@ -19,6 +20,9 @@ const state = {
   pageWindowRequests: {},
   prefetchQueue: {},
   isPrefetching: false,
+  generationMode: "url",
+  isGenerationPanelOpen: false,
+  galleryPageIndex: 0,
   controlsIdleTimer: null,
   toastTimer: null,
   fullscreenRequestId: 0
@@ -41,7 +45,23 @@ function bindEvents() {
     filterPresentations(event.target.value);
   });
 
-  document.getElementById("generationForm").addEventListener("submit", function(event) {
+  document.getElementById("generationToggle").addEventListener("click", toggleGenerationPanel);
+
+  document.querySelectorAll(".mode-tab").forEach(function(button) {
+    button.addEventListener("click", function() {
+      setGenerationMode(button.dataset.mode || "url");
+    });
+  });
+
+  document.getElementById("galleryPrevButton").addEventListener("click", function() {
+    changeGalleryPage(-1);
+  });
+
+  document.getElementById("galleryNextButton").addEventListener("click", function() {
+    changeGalleryPage(1);
+  });
+
+  document.getElementById("generationPanel").addEventListener("submit", function(event) {
     event.preventDefault();
     requestGeneration();
   });
@@ -119,6 +139,7 @@ function loadPresentations() {
 function setPresentations(presentations) {
   state.presentations = sortPresentations(presentations || []);
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+  state.galleryPageIndex = 0;
   state.knownIds = new Set(state.presentations.map(function(presentation) {
     return presentation.id;
   }));
@@ -131,51 +152,161 @@ function renderGallery() {
   gallery.innerHTML = "";
   hideError();
 
-  state.pendingUrls.forEach(function(url) {
-    gallery.appendChild(createPendingCard(url));
+  const items = state.pendingUrls.concat(state.filteredPresentations);
+  const pageCount = getGalleryPageCount(items.length);
+  state.galleryPageIndex = Math.min(state.galleryPageIndex, Math.max(pageCount - 1, 0));
+  const start = state.galleryPageIndex * GALLERY_PAGE_SIZE;
+  const visibleItems = items.slice(start, start + GALLERY_PAGE_SIZE);
+
+  visibleItems.forEach(function(item, index) {
+    const displayRank = start + index;
+    if (typeof item === "string") {
+      gallery.appendChild(createPendingCard(item, displayRank));
+      return;
+    }
+    gallery.appendChild(createPresentationCard(item, displayRank));
   });
 
   if (!state.filteredPresentations.length && !state.pendingUrls.length) {
     showEmpty("表示できるスライドがありません", "検索条件を変えるか、Drive の対象フォルダを確認してください。");
+    renderGalleryPager(items.length);
     return;
   }
 
   hideEmpty();
+  renderGalleryPager(items.length);
+  hydrateGalleryThumbnails(visibleItems, true);
+  warmHiddenPresentationThumbnails(visibleItems);
+}
 
-  state.filteredPresentations.forEach(function(presentation) {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "slide-card";
-    card.onclick = function() {
-      openPresentation(presentation.id);
-    };
+function createPresentationCard(presentation, displayRank) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "slide-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
+  card.onclick = function() {
+    openPresentation(presentation.id);
+  };
 
-    card.innerHTML =
-      '<div class="card-thumb">' +
-        imageMarkup(presentation.thumbnailUrl, presentation.title) +
+  card.innerHTML =
+    '<div class="card-thumb">' +
+      imageMarkup(presentation.thumbnailUrl, presentation.title) +
+    '</div>' +
+    '<div class="card-body">' +
+      '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
+      '<div class="meta">' +
+        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
+        '<span>' + formatDate(presentation.updatedAt) + '</span>' +
       '</div>' +
-      '<div class="card-body">' +
-        '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
-        '<div class="meta">' +
-          '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + ' slides</span>' +
-          '<span>' + formatDate(presentation.updatedAt) + '</span>' +
-        '</div>' +
-      '</div>';
+    '</div>';
 
-    gallery.appendChild(card);
+  return card;
+}
+
+function getGalleryPageCount(total) {
+  return Math.max(1, Math.ceil(total / GALLERY_PAGE_SIZE));
+}
+
+function renderGalleryPager(total) {
+  const pager = document.getElementById("galleryPager");
+  const pagerText = document.getElementById("galleryPagerText");
+  const indicator = document.getElementById("galleryPageIndicator");
+  const pageCount = getGalleryPageCount(total);
+  const pageText = total
+    ? "Page " + (state.galleryPageIndex + 1) + " / " + pageCount
+    : "";
+
+  pager.hidden = total <= GALLERY_PAGE_SIZE;
+  pagerText.textContent = pageText;
+  indicator.textContent = pageText;
+  document.getElementById("galleryPrevButton").disabled = state.galleryPageIndex <= 0;
+  document.getElementById("galleryNextButton").disabled = state.galleryPageIndex >= pageCount - 1;
+}
+
+function changeGalleryPage(delta) {
+  const total = state.pendingUrls.length + state.filteredPresentations.length;
+  const pageCount = getGalleryPageCount(total);
+  state.galleryPageIndex = Math.max(0, Math.min(state.galleryPageIndex + delta, pageCount - 1));
+  renderGallery();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function warmHiddenPresentationThumbnails(visibleItems) {
+  if (!isGasRuntime()) return;
+  const visibleIds = new Set(visibleItems.filter(function(item) {
+    return typeof item !== "string";
+  }).map(function(item) {
+    return item.id;
+  }));
+  const missing = state.filteredPresentations.some(function(presentation) {
+    return !visibleIds.has(presentation.id) && !presentation.thumbnailUrl;
+  });
+  if (!missing) return;
+  window.setTimeout(function() {
+    if (isGasRuntime()) {
+      hydrateGalleryThumbnails(
+        state.filteredPresentations.filter(function(presentation) {
+          return !visibleIds.has(presentation.id) && !presentation.thumbnailUrl;
+        }),
+        false
+      );
+    }
+  }, 250);
+}
+
+function hydrateGalleryThumbnails(items, shouldRender) {
+  if (!isGasRuntime()) return;
+  const targets = items.filter(function(item) {
+    return typeof item !== "string" && item.id && !item.thumbnailUrl && !item.isThumbnailLoading;
+  });
+  targets.slice(0, shouldRender ? GALLERY_PAGE_SIZE : 6).forEach(function(presentation) {
+    presentation.isThumbnailLoading = true;
+    google.script.run
+      .withSuccessHandler(function(meta) {
+        presentation.isThumbnailLoading = false;
+        mergeSinglePresentationMeta(meta);
+        if (shouldRender) {
+          renderGallery();
+        } else {
+          scheduleRemainingThumbnailHydration();
+        }
+      })
+      .withFailureHandler(function() {
+        presentation.isThumbnailLoading = false;
+      })
+      .getPresentationFirstThumbnail(presentation.id);
   });
 }
 
-function createPendingCard(url) {
+function scheduleRemainingThumbnailHydration() {
+  window.setTimeout(function() {
+    hydrateGalleryThumbnails(
+      state.filteredPresentations.filter(function(presentation) {
+        return !presentation.thumbnailUrl;
+      }),
+      false
+    );
+  }, 250);
+}
+
+function mergeSinglePresentationMeta(meta) {
+  if (!meta || !meta.id) return;
+  state.presentations = state.presentations.map(function(item) {
+    if (item.id !== meta.id) return item;
+    return Object.assign({}, item, meta, { pages: item.pages || meta.pages || [] });
+  });
+  state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+}
+
+function createPendingCard(label, displayRank) {
   const card = document.createElement("article");
-  card.className = "pending-card";
+  card.className = "pending-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
   card.innerHTML =
     '<div class="card-thumb">' +
-      '<div class="pending-thumb"><div><div class="loader" aria-hidden="true"></div><strong>逕滓・荳ｭ...</strong></div></div>' +
+      '<div class="pending-thumb"><div><div class="loader" aria-hidden="true"></div><strong>生成中...</strong></div></div>' +
     '</div>' +
     '<div class="card-body">' +
-      '<h2 class="card-title">' + escapeHtml(url) + '</h2>' +
-      '<div class="meta"><span>Slack 縺ｫ萓晞ｼ貂医∩</span><span>蠕・ｩ滉ｸｭ</span></div>' +
+      '<h2 class="card-title">' + escapeHtml(label) + '</h2>' +
+      '<div class="meta"><span>Slackに依頼済み</span><span>待機中</span></div>' +
     '</div>';
   return card;
 }
@@ -393,7 +524,7 @@ function renderViewer() {
       loadPageWindow(presentation.id, state.currentPageIndex, INITIAL_PAGE_COUNT, true);
     }
   } else {
-    slideFrame.innerHTML = '<div class="image-fallback">繝壹・繧ｸ逕ｻ蜒上′縺ゅｊ縺ｾ縺帙ｓ</div>';
+    slideFrame.innerHTML = '<div class="image-fallback">ページ画像がありません</div>';
   }
 
   renderPageStrip();
@@ -413,7 +544,7 @@ function showViewerLoading() {
 function showViewerError(message) {
   document.getElementById("pageIndicator").textContent = "ページ読み込み失敗";
   document.getElementById("slideFrame").innerHTML =
-    '<div class="viewer-message is-error"><div><strong>繝壹・繧ｸ繧定ｪｭ縺ｿ霎ｼ繧√∪縺帙ｓ縺ｧ縺励◆</strong><span>' + escapeHtml(message) + '</span></div></div>';
+    '<div class="viewer-message is-error"><div><strong>ページを読み込めませんでした</strong><span>' + escapeHtml(message) + '</span></div></div>';
   document.getElementById("pageStrip").innerHTML = "";
   renderSpeakerNote("ページを読み込めなかったため、ノートを表示できません。");
 }
@@ -471,7 +602,7 @@ function renderSourceLink() {
     return;
   }
 
-  sourceLink.innerHTML = '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">蜈・ｨ倅ｺ九ｒ髢九￥</a>';
+  sourceLink.innerHTML = '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">元記事を開く</a>';
 }
 
 function goToPage(index) {
@@ -495,6 +626,7 @@ function prevPage() {
 
 function filterPresentations(keyword) {
   state.filteredPresentations = filterPresentationList(keyword);
+  state.galleryPageIndex = 0;
   renderGallery();
 }
 
@@ -707,16 +839,44 @@ function syncFullscreenButton() {
   button.textContent = isFullscreen ? "\u89e3\u9664" : "\u5168\u753b\u9762";
   button.setAttribute("aria-pressed", isFullscreen ? "true" : "false");
 }
+
+function toggleGenerationPanel() {
+  setGenerationPanelOpen(!state.isGenerationPanelOpen);
+}
+
+function setGenerationPanelOpen(isOpen) {
+  state.isGenerationPanelOpen = isOpen;
+  const panel = document.getElementById("generationPanel");
+  const toggle = document.getElementById("generationToggle");
+  panel.hidden = !isOpen;
+  toggle.textContent = isOpen ? "閉じる" : "スライド生成";
+  toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setGenerationMode(mode) {
+  state.generationMode = mode === "research" ? "research" : "url";
+  const isResearch = state.generationMode === "research";
+  document.getElementById("urlFields").hidden = isResearch;
+  document.getElementById("researchFields").hidden = !isResearch;
+  document.querySelectorAll(".mode-tab").forEach(function(button) {
+    const active = button.dataset.mode === state.generationMode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  setGenerationMessage("");
+}
+
 function requestGeneration() {
-  const input = document.getElementById("articleUrlInput");
-  const url = input.value.trim();
+  const payloadResult = collectGenerationPayload();
 
   setGenerationMessage("");
-  if (!/^https?:\/\/\S+/i.test(url)) {
-    setGenerationMessage("http:// または https:// で始まるURLを入力してください。", true);
+  if (!payloadResult.ok) {
+    setGenerationMessage(payloadResult.message, true);
     return;
   }
 
+  const payload = payloadResult.payload;
+  const pendingLabel = createPendingLabel(payload);
   setGenerationSubmitting(true);
 
   if (isGasRuntime()) {
@@ -727,38 +887,98 @@ function requestGeneration() {
           setGenerationMessage("生成依頼の送信に失敗しました。", true);
           return;
         }
-        onGenerationRequested(url);
+        onGenerationRequested(pendingLabel);
       })
       .withFailureHandler(function(error) {
         setGenerationSubmitting(false);
-        removePendingCard(url);
+        removePendingCard(pendingLabel);
         setGenerationMessage(error && error.message ? error.message : String(error), true);
       })
-      .requestSlideGeneration(url);
+      .requestSlideGeneration(payload);
     return;
   }
 
   window.setTimeout(function() {
-    onGenerationRequested(url);
+    onGenerationRequested(pendingLabel);
     window.setTimeout(function() {
-      completeLocalGeneration(url);
+      completeLocalGeneration(pendingLabel);
     }, 2500);
   }, 500);
 }
 
-function onGenerationRequested(url) {
+function collectGenerationPayload() {
+  const payload = {
+    mode: state.generationMode,
+    urls: [],
+    researchPrompt: "",
+    audience: document.getElementById("audienceInput").value.trim(),
+    focus: document.getElementById("focusInput").value.trim(),
+    pages: document.getElementById("pagesInput").value.trim()
+  };
+
+  if (state.generationMode === "research") {
+    payload.researchPrompt = document.getElementById("researchPromptInput").value.trim();
+    if (!payload.researchPrompt) {
+      return { ok: false, message: "調査プロンプトを入力してください。" };
+    }
+  } else {
+    payload.urls = [1, 2, 3].map(function(index) {
+      return document.getElementById("urlInput" + index).value.trim();
+    }).filter(Boolean);
+    if (!payload.urls.length) {
+      return { ok: false, message: "URLを1件以上入力してください。" };
+    }
+    if (payload.urls.length > 3) {
+      return { ok: false, message: "URLは最大3件まで指定できます。" };
+    }
+    if (payload.urls.some(function(url) { return !/^https?:\/\/\S+/i.test(url); })) {
+      return { ok: false, message: "URLは http:// または https:// で始まる形式で入力してください。" };
+    }
+  }
+
+  if (payload.pages && !/^\d+$/.test(payload.pages)) {
+    return { ok: false, message: "目標スライド数は整数で入力してください。" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      urls: payload.urls,
+      researchPrompt: payload.researchPrompt,
+      audience: payload.audience,
+      focus: payload.focus,
+      pages: payload.pages ? Number(payload.pages) : undefined
+    }
+  };
+}
+
+function createPendingLabel(payload) {
+  if (payload.researchPrompt) {
+    return "リサーチ: " + payload.researchPrompt;
+  }
+  return payload.urls.join(", ");
+}
+
+function onGenerationRequested(label) {
   setGenerationSubmitting(false);
-  document.getElementById("articleUrlInput").value = "";
   setGenerationMessage("生成依頼を送信しました。");
-  addPendingCard(url);
+  clearGenerationInputs();
+  addPendingCard(label);
   startPolling();
+}
+
+function clearGenerationInputs() {
+  ["urlInput1", "urlInput2", "urlInput3", "researchPromptInput"].forEach(function(id) {
+    const node = document.getElementById(id);
+    if (node) node.value = "";
+  });
 }
 
 function setGenerationSubmitting(isSubmitting) {
   state.isRequestingGeneration = isSubmitting;
   const button = document.getElementById("generationButton");
   button.disabled = isSubmitting;
-  button.textContent = isSubmitting ? "騾∽ｿ｡荳ｭ..." : "逕滓・縺吶ｋ";
+  button.textContent = isSubmitting ? "送信中..." : "生成を依頼";
 }
 
 function setGenerationMessage(message, isError) {
@@ -771,6 +991,7 @@ function addPendingCard(url) {
   if (state.pendingUrls.indexOf(url) === -1) {
     state.pendingUrls.unshift(url);
   }
+  state.galleryPageIndex = 0;
   renderGallery();
 }
 
@@ -823,8 +1044,12 @@ function mergePresentationMeta(presentations) {
     const existing = state.presentations.find(function(item) {
       return item.id === meta.id;
     });
-    return existing && existing.pages && existing.pages.length
-      ? Object.assign({}, meta, { pages: existing.pages })
+    return existing
+      ? Object.assign({}, meta, {
+          thumbnailUrl: meta.thumbnailUrl || existing.thumbnailUrl || "",
+          thumbnailFetchedAt: meta.thumbnailFetchedAt || existing.thumbnailFetchedAt || "",
+          pages: existing.pages && existing.pages.length ? existing.pages : meta.pages
+        })
       : meta;
   });
 
@@ -844,6 +1069,7 @@ function mergePresentationMeta(presentations) {
   });
 
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
+  state.galleryPageIndex = 0;
   renderGallery();
   if (!state.pendingUrls.length) {
     stopPolling();
@@ -869,7 +1095,7 @@ function showLoading(isVisible) {
 
 function showError(message) {
   const errorState = document.getElementById("errorState");
-  errorState.innerHTML = '<div><strong>隱ｭ縺ｿ霎ｼ縺ｿ縺ｫ螟ｱ謨励＠縺ｾ縺励◆</strong><span>' + escapeHtml(message) + '</span></div>';
+  errorState.innerHTML = '<div><strong>読み込みに失敗しました</strong><span>' + escapeHtml(message) + '</span></div>';
   errorState.classList.add("is-visible");
 }
 
@@ -888,14 +1114,14 @@ function hideEmpty() {
 }
 
 function imageMarkup(src, alt) {
-  if (!src) return '<div class="image-fallback">逕ｻ蜒上ｒ陦ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ</div>';
+  if (!src) return '<div class="image-fallback">画像を表示できません</div>';
   return '<img src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '" loading="lazy" onerror="this.replaceWith(createImageFallback())">';
 }
 
 function createImageFallback() {
   const fallback = document.createElement("div");
   fallback.className = "image-fallback";
-  fallback.textContent = "逕ｻ蜒上ｒ陦ｨ遉ｺ縺ｧ縺阪∪縺帙ｓ";
+  fallback.textContent = "画像を表示できません";
   return fallback;
 }
 

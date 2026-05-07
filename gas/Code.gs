@@ -1,4 +1,4 @@
-const DEFAULT_SLIDES_FOLDER_ID = '';
+const DEFAULT_SLIDES_FOLDER_ID = 'C0B032Z69KR';
 const META_CACHE_KEY = 'presentations_meta_v3';
 const META_INDEX_KEY = 'presentations_meta_index_v3';
 const META_CACHE_SECONDS = 1200;
@@ -90,11 +90,33 @@ function getPresentationPages(presentationId) {
   });
 }
 
-function requestSlideGeneration(articleUrl) {
-  const url = String(articleUrl || '').trim();
-  if (!/^https?:\/\/\S+/i.test(url)) {
-    throw new Error('articleUrl must start with http:// or https://.');
+function getPresentationFirstThumbnail(presentationId) {
+  if (!presentationId) {
+    throw new Error('presentationId is required.');
   }
+
+  const file = DriveApp.getFileById(presentationId);
+  const updatedAt = file.getLastUpdated().toISOString();
+  const updatedAtMillis = String(file.getLastUpdated().getTime());
+  const outline = getPresentationOutline_(presentationId, updatedAtMillis);
+  const firstPage = outline.pages.length ? getPresentationPage_(presentationId, outline, 0) : null;
+
+  return {
+    id: presentationId,
+    title: file.getName(),
+    description: file.getDescription() || '',
+    updatedAt: updatedAt,
+    updatedAtMillis: updatedAtMillis,
+    firstPageObjectId: firstPage ? firstPage.pageObjectId : '',
+    thumbnailUrl: firstPage ? firstPage.imageUrl : '',
+    thumbnailFetchedAt: new Date().toISOString(),
+    pageCount: outline.pages.length,
+    pages: []
+  };
+}
+
+function requestSlideGeneration(input) {
+  const commandText = buildSlideGenerationCommand_(input);
 
   const properties = PropertiesService.getScriptProperties();
   const token = properties.getProperty('SLACK_BOT_TOKEN');
@@ -115,7 +137,7 @@ function requestSlideGeneration(articleUrl) {
     },
     payload: JSON.stringify({
       channel: channelId,
-      text: '[slide-generate] ' + url
+      text: commandText
     }),
     muteHttpExceptions: true
   });
@@ -126,6 +148,69 @@ function requestSlideGeneration(articleUrl) {
   }
 
   return { ok: true };
+}
+
+function buildSlideGenerationCommand_(input) {
+  if (typeof input === 'string') {
+    const url = normalizeUrl_(input);
+    if (!/^https?:\/\/\S+/i.test(url)) {
+      throw new Error('URLは http:// または https:// で始まる形式で入力してください。');
+    }
+    return '[slide-generate] ' + url;
+  }
+
+  const payload = input || {};
+  const urls = Array.isArray(payload.urls)
+    ? payload.urls.map(normalizeUrl_).filter(Boolean)
+    : [];
+  const researchPrompt = String(payload.researchPrompt || '').trim();
+  const audience = String(payload.audience || '').trim();
+  const focus = String(payload.focus || '').trim();
+  const pages = payload.pages === undefined || payload.pages === null || payload.pages === ''
+    ? ''
+    : String(payload.pages).trim();
+
+  if (urls.length && researchPrompt) {
+    throw new Error('URLと調査プロンプトは同時に指定できません。');
+  }
+  if (!urls.length && !researchPrompt) {
+    throw new Error('URLまたは調査プロンプトを入力してください。');
+  }
+  if (urls.length > 3) {
+    throw new Error('URLは最大3件まで指定できます。');
+  }
+  if (urls.some(function(url) { return !/^https?:\/\/\S+/i.test(url); })) {
+    throw new Error('URLは http:// または https:// で始まる形式で入力してください。');
+  }
+  if (pages && !/^\d+$/.test(pages)) {
+    throw new Error('目標スライド数は整数で入力してください。');
+  }
+
+  const args = ['[slide-generate]'];
+  if (urls.length) {
+    args.push('--url', urls.join(', '));
+  } else {
+    args.push('--research', quoteArg_(researchPrompt));
+  }
+  if (audience) {
+    args.push('--audience', quoteArg_(audience));
+  }
+  if (focus) {
+    args.push('--focus', quoteArg_(focus));
+  }
+  if (pages) {
+    args.push('--pages', pages);
+  }
+
+  return args.join(' ');
+}
+
+function quoteArg_(value) {
+  return '"' + String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+
+function normalizeUrl_(value) {
+  return String(value || '').trim().replace(/[.,;:!?)}\]>]+$/g, '');
 }
 
 function rebuildPresentationsMeta_(forceRefresh) {
@@ -147,7 +232,6 @@ function rebuildPresentationsMeta_(forceRefresh) {
     const existing = existingById[presentationId];
 
     if (existing && existing.updatedAt === updatedAt && existing.pageCount >= 0) {
-      const thumbnailUrl = getFreshFirstThumbnailUrl_(presentationId, existing, updatedAtMillis);
       presentations.push({
         id: existing.id,
         title: file.getName(),
@@ -155,8 +239,8 @@ function rebuildPresentationsMeta_(forceRefresh) {
         updatedAt: existing.updatedAt,
         updatedAtMillis: existing.updatedAtMillis || updatedAtMillis,
         firstPageObjectId: existing.firstPageObjectId || '',
-        thumbnailUrl: thumbnailUrl,
-        thumbnailFetchedAt: new Date().toISOString(),
+        thumbnailUrl: existing.thumbnailUrl || '',
+        thumbnailFetchedAt: existing.thumbnailFetchedAt || '',
         pageCount: existing.pageCount,
         pages: []
       });
@@ -165,7 +249,7 @@ function rebuildPresentationsMeta_(forceRefresh) {
     }
 
     const outline = getPresentationOutline_(presentationId, updatedAtMillis);
-    const firstPage = outline.pages.length ? getPresentationPage_(presentationId, outline, 0) : null;
+    const firstPage = outline.pages.length ? outline.pages[0] : null;
 
     presentations.push({
       id: presentationId,
@@ -174,8 +258,8 @@ function rebuildPresentationsMeta_(forceRefresh) {
       updatedAt: updatedAt,
       updatedAtMillis: updatedAtMillis,
       firstPageObjectId: firstPage ? firstPage.pageObjectId : '',
-      thumbnailUrl: firstPage ? firstPage.imageUrl : '',
-      thumbnailFetchedAt: new Date().toISOString(),
+      thumbnailUrl: '',
+      thumbnailFetchedAt: '',
       pageCount: outline.pages.length,
       pages: []
     });
@@ -245,24 +329,6 @@ function getPresentationPage_(presentationId, outline, index) {
 
   writeCache_(cacheKey, hydrated, THUMBNAIL_CACHE_SECONDS);
   return hydrated;
-}
-
-function getFreshFirstThumbnailUrl_(presentationId, existing, updatedAtMillis) {
-  const fetchedAt = existing.thumbnailFetchedAt ? new Date(existing.thumbnailFetchedAt).getTime() : 0;
-  const isFresh = fetchedAt && (Date.now() - fetchedAt) < (THUMBNAIL_CACHE_SECONDS * 1000);
-
-  if (isFresh && existing.thumbnailUrl) {
-    return existing.thumbnailUrl;
-  }
-
-  if (existing.firstPageObjectId) {
-    return getSlideThumbnailUrl_(presentationId, existing.firstPageObjectId);
-  }
-
-  const outline = getPresentationOutline_(presentationId, updatedAtMillis);
-  return outline.pages.length
-    ? getSlideThumbnailUrl_(presentationId, outline.pages[0].pageObjectId)
-    : '';
 }
 
 function getSlidesFiles_() {
