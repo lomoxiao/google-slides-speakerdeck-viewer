@@ -1,9 +1,8 @@
-﻿<script>
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
 const GALLERY_PAGE_SIZE = 3;
 const MOBILE_GALLERY_PAGE_SIZE = 5;
-const BUILD_ID = "phase3e-viewport-debug-20260508";
+const BUILD_ID = "github-pages-api-mvp-20260509";
 
 const state = {
   presentations: [],
@@ -40,6 +39,58 @@ const samplePresentations = [
   createSamplePresentation("market-research", "Market Research Notes", "https://example.com/market-research", "2026-04-20T15:10:00Z", "eef3f0", "24312b", 10),
   createSamplePresentation("quarterly-planning", "Quarterly Planning Deck https://example.com/quarterly-planning", "", "2026-04-12T12:00:00Z", "f5f1f1", "332a2a", 6)
 ];
+
+const apiClient = {
+  getConfig: function() {
+    return window.SLIDE_VIEWER_CONFIG || {};
+  },
+
+  hasApiUrl: function() {
+    return Boolean(this.getConfig().GAS_API_URL);
+  },
+
+  get: function(action, params) {
+    const config = this.getConfig();
+    const url = new URL(config.GAS_API_URL);
+    url.searchParams.set("action", action);
+    if (config.CLIENT_KEY) {
+      url.searchParams.set("clientKey", config.CLIENT_KEY);
+    }
+    Object.keys(params || {}).forEach(function(key) {
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.set(key, String(params[key]));
+      }
+    });
+    return fetch(url.toString(), { method: "GET" }).then(parseApiResponse);
+  },
+
+  post: function(action, payload) {
+    const config = this.getConfig();
+    return fetch(config.GAS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({}, payload || {}, {
+        action: action,
+        clientKey: config.CLIENT_KEY || ""
+      }))
+    }).then(parseApiResponse);
+  }
+};
+
+function parseApiResponse(response) {
+  if (!response.ok) {
+    throw new Error("API request failed: HTTP " + response.status);
+  }
+  return response.json().then(function(result) {
+    if (!result || !result.ok) {
+      const message = result && result.error && result.error.message
+        ? result.error.message
+        : "API request failed.";
+      throw new Error(message);
+    }
+    return result.data;
+  });
+}
 
 function init() {
   updateResponsiveMode();
@@ -175,15 +226,14 @@ function loadPresentations() {
   hideError();
 
   if (isGasRuntime()) {
-    google.script.run
-      .withSuccessHandler(function(presentations) {
+    apiClient.get("listPresentations")
+      .then(function(presentations) {
         setPresentations(presentations || []);
       })
-      .withFailureHandler(function(error) {
+      .catch(function(error) {
         showLoading(false);
         showError(error && error.message ? error.message : String(error));
-      })
-      .getPresentationsMeta();
+      });
     return;
   }
 
@@ -329,8 +379,8 @@ function hydrateGalleryThumbnails(items, shouldRender) {
   });
   targets.slice(0, shouldRender ? getGalleryPageSize() : 6).forEach(function(presentation) {
     presentation.isThumbnailLoading = true;
-    google.script.run
-      .withSuccessHandler(function(meta) {
+    apiClient.get("getFirstThumbnail", { presentationId: presentation.id })
+      .then(function(meta) {
         presentation.isThumbnailLoading = false;
         mergeSinglePresentationMeta(meta);
         if (shouldRender) {
@@ -339,10 +389,9 @@ function hydrateGalleryThumbnails(items, shouldRender) {
           scheduleRemainingThumbnailHydration();
         }
       })
-      .withFailureHandler(function() {
+      .catch(function() {
         presentation.isThumbnailLoading = false;
-      })
-      .getPresentationFirstThumbnail(presentation.id);
+      });
   });
 }
 
@@ -378,7 +427,7 @@ function renderGenerationStatusPanel() {
   panel.hidden = false;
   panel.innerHTML =
     '<div class="status-panel-head">' +
-      '<div><strong>生成依頼を確認中</strong><span>新しいスライドが表示されるまで自動で確認します。</span></div>' +
+      '<div><strong>Slackへ送信済み</strong><span>完了通知はSlackをご確認ください。</span></div>' +
       '<span>' + state.pendingUrls.length + '件</span>' +
     '</div>' +
     state.pendingUrls.map(function(item) {
@@ -387,7 +436,7 @@ function renderGenerationStatusPanel() {
         '<div class="pending-dot is-' + status.kind + '"></div>' +
         '<div>' +
           '<h2>' + escapeHtml(item.label) + '</h2>' +
-          '<p>' + escapeHtml(status.text) + '</p>' +
+          '<p>' + escapeHtml(status.text + (item.trackingId ? " / " + item.trackingId : "")) + '</p>' +
         '</div>' +
         '<time>' + formatElapsed(item.createdAt) + '</time>' +
       '</article>';
@@ -395,17 +444,7 @@ function renderGenerationStatusPanel() {
 }
 
 function getPendingStatus(item) {
-  const elapsed = Date.now() - item.createdAt;
-  if (elapsed < 10000) {
-    return { kind: "sent", text: "送信済み" };
-  }
-  if (elapsed < 90000) {
-    return { kind: "waiting", text: "生成処理の開始を待っています" };
-  }
-  if (elapsed < 300000) {
-    return { kind: "checking", text: "ライブラリへの反映を確認しています" };
-  }
-  return { kind: "slow", text: "時間がかかっています。完了後に一覧へ表示されます" };
+  return { kind: "sent", text: "Slack送信済み" };
 }
 
 function startPendingStatusTimer() {
@@ -500,8 +539,12 @@ function loadPageWindow(presentationId, startIndex, count, isPriority) {
     showPageLoadingIfCurrentWindow(safeStart, safeCount);
   }
 
-  google.script.run
-    .withSuccessHandler(function(result) {
+  apiClient.get("getPageWindow", {
+    presentationId: presentationId,
+    startIndex: safeStart,
+    count: safeCount
+  })
+    .then(function(result) {
       delete state.pageWindowRequests[requestKey];
       mergePageWindow(presentationId, result);
       if (isPriority) {
@@ -509,13 +552,12 @@ function loadPageWindow(presentationId, startIndex, count, isPriority) {
       }
       queueRemainingPrefetch(presentationId);
     })
-    .withFailureHandler(function(error) {
+    .catch(function(error) {
       delete state.pageWindowRequests[requestKey];
       if (isPriority) {
         showViewerError(error && error.message ? error.message : String(error));
       }
-    })
-    .getPresentationPageWindow(presentationId, safeStart, safeCount);
+    });
 }
 
 function mergePageWindow(presentationId, result) {
@@ -588,17 +630,20 @@ function runNextPrefetch() {
   delete state.prefetchQueue[key];
   state.isPrefetching = true;
 
-  google.script.run
-    .withSuccessHandler(function(result) {
+  apiClient.get("getPageWindow", {
+    presentationId: next.presentationId,
+    startIndex: next.startIndex,
+    count: next.count
+  })
+    .then(function(result) {
       state.isPrefetching = false;
       mergePageWindow(next.presentationId, result);
       runNextPrefetch();
     })
-    .withFailureHandler(function() {
+    .catch(function() {
       state.isPrefetching = false;
       runNextPrefetch();
-    })
-    .getPresentationPageWindow(next.presentationId, next.startIndex, next.count);
+    });
 }
 
 function renderViewerShell() {
@@ -1159,26 +1204,20 @@ function requestGeneration() {
   setGenerationSubmitting(true);
 
   if (isGasRuntime()) {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        if (!result || !result.ok) {
-          setGenerationSubmitting(false);
-          setGenerationMessage("生成依頼の送信に失敗しました。", true);
-          return;
-        }
-        onGenerationRequested(pendingLabel);
+    apiClient.post("requestGeneration", payload)
+      .then(function(result) {
+        onGenerationRequested(pendingLabel, result && result.trackingId);
       })
-      .withFailureHandler(function(error) {
+      .catch(function(error) {
         setGenerationSubmitting(false);
         removePendingCard(pendingLabel);
         setGenerationMessage(error && error.message ? error.message : String(error), true);
-      })
-      .requestSlideGeneration(payload);
+      });
     return;
   }
 
   window.setTimeout(function() {
-    onGenerationRequested(pendingLabel);
+    onGenerationRequested(pendingLabel, "local_preview");
     window.setTimeout(function() {
       completeLocalGeneration(pendingLabel);
     }, 2500);
@@ -1222,6 +1261,7 @@ function collectGenerationPayload() {
   return {
     ok: true,
     payload: {
+      mode: payload.mode,
       urls: payload.urls,
       researchPrompt: payload.researchPrompt,
       audience: payload.audience,
@@ -1238,11 +1278,11 @@ function createPendingLabel(payload) {
   return payload.urls.join(", ");
 }
 
-function onGenerationRequested(label) {
+function onGenerationRequested(label, trackingId) {
   setGenerationSubmitting(false);
-  setGenerationMessage("生成依頼を送信しました。");
+  setGenerationMessage("生成依頼をSlackへ送信しました。完了通知はSlackをご確認ください。");
   clearGenerationInputs();
-  addPendingCard(label);
+  addPendingCard(label, trackingId);
   if (isMobileViewport()) {
     setGenerationPanelOpen(false);
   }
@@ -1269,10 +1309,11 @@ function setGenerationMessage(message, isError) {
   messageNode.classList.toggle("is-error", Boolean(isError));
 }
 
-function addPendingCard(url) {
+function addPendingCard(url, trackingId) {
   if (!state.pendingUrls.some(function(item) { return item.label === url; })) {
     state.pendingUrls.unshift({
       label: url,
+      trackingId: trackingId || "",
       createdAt: Date.now()
     });
   }
@@ -1293,7 +1334,8 @@ function removePendingCard(url) {
 
 function startPolling() {
   if (state.pollingTimer) return;
-  state.pollingTimer = window.setInterval(refreshPresentationsMeta, 30000);
+  const interval = Number(apiClient.getConfig().REFRESH_INTERVAL_MS || 30000);
+  state.pollingTimer = window.setInterval(refreshPresentationsMeta, interval);
 }
 
 function stopPolling() {
@@ -1309,14 +1351,13 @@ function refreshPresentationsMeta() {
   }
 
   if (isGasRuntime()) {
-    google.script.run
-      .withSuccessHandler(function(presentations) {
+    apiClient.get("listPresentations", { refresh: "1" })
+      .then(function(presentations) {
         mergePresentationMeta(presentations || []);
       })
-      .withFailureHandler(function(error) {
+      .catch(function(error) {
         setGenerationMessage(error && error.message ? error.message : String(error), true);
-      })
-      .warmPresentationsCache();
+      });
   }
 }
 
@@ -1484,7 +1525,7 @@ function formatDate(value) {
 }
 
 function isGasRuntime() {
-  return Boolean(window.google && google.script && google.script.run);
+  return apiClient.hasApiUrl();
 }
 
 function escapeHtml(value) {
@@ -1497,4 +1538,3 @@ function escapeHtml(value) {
 }
 
 document.addEventListener("DOMContentLoaded", init);
-</script>

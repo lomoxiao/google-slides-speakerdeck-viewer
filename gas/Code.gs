@@ -1,433 +1,94 @@
-const DEFAULT_SLIDES_FOLDER_ID = 'C0B032Z69KR';
-const META_CACHE_KEY = 'presentations_meta_v3';
-const META_INDEX_KEY = 'presentations_meta_index_v3';
-const META_CACHE_SECONDS = 1200;
-const OUTLINE_CACHE_SECONDS = 21600;
-const THUMBNAIL_CACHE_SECONDS = 1200;
-const CACHE_MAX_CHARS = 90000;
-const PROPERTY_MAX_CHARS = 8000;
-const INITIAL_PAGE_COUNT = 1;
-const PREFETCH_PAGE_COUNT = 3;
-const APP_BUILD_ID = 'phase3e-viewport-debug-20260508';
+const APP_BUILD_ID = 'github-pages-api-mvp-20260509';
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.debug === 'force') {
-    return HtmlService
-      .createHtmlOutput(
-        '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">' +
-        '<pre style="font:16px/1.5 monospace;white-space:pre-wrap;padding:16px;">' +
-        'Slide Library forced debug\n' +
-        'serverBuild=' + APP_BUILD_ID + '\n' +
-        'requestedAt=' + new Date().toISOString() + '\n' +
-        'route=Code.gs doGet force\n' +
-        '</pre>'
-      )
-      .setTitle('Slide Library debug')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-
-  const template = HtmlService.createTemplateFromFile('Index');
-  template.buildId = APP_BUILD_ID;
-  template.debugMode = Boolean(e && e.parameter && e.parameter.debug === '1');
-  template.debugRequestedAt = new Date().toISOString();
-  const output = template
-    .evaluate()
-    .setTitle('Slide Library')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  if (!template.debugMode) {
-    return output;
-  }
-
-  const marker =
-    '<aside id="serverDebugMarker" style="position:fixed;top:10px;left:10px;right:10px;z-index:9999;pointer-events:none;padding:12px;border:1px solid #d0d7de;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 18px 48px rgba(31,35,40,.22);color:#1f2328;font:12px/1.45 monospace;white-space:pre-wrap;">' +
-    '<strong style="display:block;margin-bottom:6px;font:700 14px/1.3 sans-serif;">Slide Library injected debug</strong>' +
-    'serverBuild=' + APP_BUILD_ID + '\n' +
-    'debugMode=true\n' +
-    'requestedAt=' + template.debugRequestedAt + '\n' +
-    'route=Code.gs injected into evaluated Index\n' +
-    'clientMetrics=waiting...' +
-    '</aside>' +
-    '<script>(function(){' +
-    'function pick(selector){var el=document.querySelector(selector);if(!el)return selector+": not found";var s=getComputedStyle(el);var r=el.getBoundingClientRect();return selector+" | font="+s.fontSize+" | line="+s.lineHeight+" | height="+(Math.round(r.height*10)/10)+"px | minHeight="+s.minHeight+" | display="+s.display;}' +
-    'function update(){var panel=document.getElementById("serverDebugMarker");if(!panel)return;var viewport=document.querySelector("meta[name=viewport]");var vv=window.visualViewport?Math.round(window.visualViewport.width)+"x"+Math.round(window.visualViewport.height):"n/a";var lines=["Slide Library injected debug","serverBuild=' + APP_BUILD_ID + '","debugMode=true","requestedAt=' + template.debugRequestedAt + '","route=Code.gs injected into evaluated Index","url="+location.href,"viewport="+(viewport?viewport.getAttribute("content"):""),"inner="+innerWidth+"x"+innerHeight,"visual="+vv,"docClient="+document.documentElement.clientWidth+"x"+document.documentElement.clientHeight,"ua="+navigator.userAgent,"bodyClass="+document.body.className,"htmlClass="+document.documentElement.className,"mobileClass="+document.body.classList.contains("mobile-layout"),"gasMobileFrameCandidate="+(document.body.classList.contains("mobile-layout")&&/script\\\\.googleusercontent\\\\.com|script\\\\.google\\\\.com/i.test(location.href)&&innerWidth>=900),pick(".generation-panel"),pick(".generation-head h2"),pick(".mode-tab"),pick(".field-box"),pick(".field-box span"),pick(".field-box input"),pick(".generation-details summary"),pick(".primary-button"),pick(".search-panel"),pick(".search-title-row h2"),pick(".search-box"),pick(".search-box input"),pick(".search-clear")];panel.textContent=lines.join("\\n");}' +
-    'window.addEventListener("load",function(){setTimeout(update,300);});window.addEventListener("resize",function(){setTimeout(update,100);});document.addEventListener("click",function(){setTimeout(update,250);},true);setTimeout(update,800);' +
-    '})();</script>';
-  return HtmlService
-    .createHtmlOutput(output.getContent().replace('<body', marker + '<body'))
-    .setTitle('Slide Library')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return handleApiRequest_(e, 'GET');
 }
 
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+function doPost(e) {
+  return handleApiRequest_(e, 'POST');
 }
 
-function getPresentations() {
-  return getPresentationsMeta();
-}
-
-function getPresentationsMeta() {
-  const cached = readCache_(META_CACHE_KEY);
-  if (cached) {
-    return cached;
-  }
-
-  return rebuildPresentationsMeta_(false);
-}
-
-function warmPresentationsCache() {
-  return rebuildPresentationsMeta_(true);
-}
-
-function installWarmPresentationsTrigger() {
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'warmPresentationsCache') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  });
-
-  ScriptApp.newTrigger('warmPresentationsCache')
-    .timeBased()
-    .everyMinutes(15)
-    .create();
-
-  return { ok: true };
-}
-
-function getPresentationPageWindow(presentationId, startIndex, count) {
-  if (!presentationId) {
-    throw new Error('presentationId is required.');
-  }
-
-  const outline = getPresentationOutline_(presentationId);
-  const total = outline.pages.length;
-  const safeStart = Math.max(0, Math.min(Number(startIndex) || 0, Math.max(total - 1, 0)));
-  const safeCount = Math.max(1, Number(count) || INITIAL_PAGE_COUNT);
-  const end = Math.min(total, safeStart + safeCount);
-  const pages = [];
-
-  for (let index = safeStart; index < end; index += 1) {
-    pages.push(getPresentationPage_(presentationId, outline, index));
-  }
-
-  return {
-    presentationId: presentationId,
-    startIndex: safeStart,
-    count: pages.length,
-    pageCount: total,
-    pages: pages
-  };
-}
-
-function getPresentationPages(presentationId) {
-  if (!presentationId) {
-    throw new Error('presentationId is required.');
-  }
-
-  const outline = getPresentationOutline_(presentationId);
-  return outline.pages.map(function(_page, index) {
-    return getPresentationPage_(presentationId, outline, index);
-  });
-}
-
-function getPresentationFirstThumbnail(presentationId) {
-  if (!presentationId) {
-    throw new Error('presentationId is required.');
-  }
-
-  const file = DriveApp.getFileById(presentationId);
-  const updatedAt = file.getLastUpdated().toISOString();
-  const updatedAtMillis = String(file.getLastUpdated().getTime());
-  const outline = getPresentationOutline_(presentationId, updatedAtMillis);
-  const firstPage = outline.pages.length ? getPresentationPage_(presentationId, outline, 0) : null;
-
-  return {
-    id: presentationId,
-    title: file.getName(),
-    description: file.getDescription() || '',
-    updatedAt: updatedAt,
-    updatedAtMillis: updatedAtMillis,
-    firstPageObjectId: firstPage ? firstPage.pageObjectId : '',
-    thumbnailUrl: firstPage ? firstPage.imageUrl : '',
-    thumbnailFetchedAt: new Date().toISOString(),
-    pageCount: outline.pages.length,
-    pages: []
-  };
-}
-
-function requestSlideGeneration(input) {
-  const commandText = buildSlideGenerationCommand_(input);
-
-  const properties = PropertiesService.getScriptProperties();
-  const token = properties.getProperty('SLACK_BOT_TOKEN');
-  const channelId = properties.getProperty('SLACK_COMPLETION_CHANNEL_ID');
-
-  if (!token) {
-    throw new Error('SLACK_BOT_TOKEN is not set.');
-  }
-  if (!channelId) {
-    throw new Error('SLACK_COMPLETION_CHANNEL_ID is not set.');
-  }
-
-  const response = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
-    method: 'post',
-    contentType: 'application/json',
-    headers: {
-      Authorization: 'Bearer ' + token
-    },
-    payload: JSON.stringify({
-      channel: channelId,
-      text: commandText
-    }),
-    muteHttpExceptions: true
-  });
-
-  const body = JSON.parse(response.getContentText() || '{}');
-  if (!body.ok) {
-    throw new Error('Slack post failed: ' + (body.error || response.getResponseCode()));
-  }
-
-  return { ok: true };
-}
-
-function buildSlideGenerationCommand_(input) {
-  if (typeof input === 'string') {
-    const url = normalizeUrl_(input);
-    if (!/^https?:\/\/\S+/i.test(url)) {
-      throw new Error('URLは http:// または https:// で始まる形式で入力してください。');
-    }
-    return '[slide-generate] ' + url;
-  }
-
-  const payload = input || {};
-  const urls = Array.isArray(payload.urls)
-    ? payload.urls.map(normalizeUrl_).filter(Boolean)
-    : [];
-  const researchPrompt = String(payload.researchPrompt || '').trim();
-  const audience = String(payload.audience || '').trim();
-  const focus = String(payload.focus || '').trim();
-  const pages = payload.pages === undefined || payload.pages === null || payload.pages === ''
-    ? ''
-    : String(payload.pages).trim();
-
-  if (urls.length && researchPrompt) {
-    throw new Error('URLと調査プロンプトは同時に指定できません。');
-  }
-  if (!urls.length && !researchPrompt) {
-    throw new Error('URLまたは調査プロンプトを入力してください。');
-  }
-  if (urls.length > 3) {
-    throw new Error('URLは最大3件まで指定できます。');
-  }
-  if (urls.some(function(url) { return !/^https?:\/\/\S+/i.test(url); })) {
-    throw new Error('URLは http:// または https:// で始まる形式で入力してください。');
-  }
-  if (pages && !/^\d+$/.test(pages)) {
-    throw new Error('目標スライド数は整数で入力してください。');
-  }
-
-  const args = ['[slide-generate]'];
-  if (urls.length) {
-    args.push('--url', urls.join(', '));
-  } else {
-    args.push('--research', quoteArg_(researchPrompt));
-  }
-  if (audience) {
-    args.push('--audience', quoteArg_(audience));
-  }
-  if (focus) {
-    args.push('--focus', quoteArg_(focus));
-  }
-  if (pages) {
-    args.push('--pages', pages);
-  }
-
-  return args.join(' ');
-}
-
-function quoteArg_(value) {
-  return '"' + String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
-}
-
-function normalizeUrl_(value) {
-  return String(value || '').trim().replace(/[.,;:!?)}\]>]+$/g, '');
-}
-
-function rebuildPresentationsMeta_(forceRefresh) {
-  const files = getSlidesFiles_();
-  const existingMeta = forceRefresh ? [] : readStoredMeta_();
-  const existingById = {};
-  existingMeta.forEach(function(item) {
-    existingById[item.id] = item;
-  });
-
-  const presentations = [];
-  const index = {};
-
-  while (files.hasNext()) {
-    const file = files.next();
-    const presentationId = file.getId();
-    const updatedAt = file.getLastUpdated().toISOString();
-    const updatedAtMillis = String(file.getLastUpdated().getTime());
-    const existing = existingById[presentationId];
-
-    if (existing && existing.updatedAt === updatedAt && existing.pageCount >= 0) {
-      presentations.push({
-        id: existing.id,
-        title: file.getName(),
-        description: file.getDescription() || existing.description || '',
-        updatedAt: existing.updatedAt,
-        updatedAtMillis: existing.updatedAtMillis || updatedAtMillis,
-        firstPageObjectId: existing.firstPageObjectId || '',
-        thumbnailUrl: existing.thumbnailUrl || '',
-        thumbnailFetchedAt: existing.thumbnailFetchedAt || '',
-        pageCount: existing.pageCount,
-        pages: []
-      });
-      index[presentationId] = updatedAtMillis;
-      continue;
-    }
-
-    const outline = getPresentationOutline_(presentationId, updatedAtMillis);
-    const firstPage = outline.pages.length ? outline.pages[0] : null;
-
-    presentations.push({
-      id: presentationId,
-      title: file.getName(),
-      description: file.getDescription() || '',
-      updatedAt: updatedAt,
-      updatedAtMillis: updatedAtMillis,
-      firstPageObjectId: firstPage ? firstPage.pageObjectId : '',
-      thumbnailUrl: '',
-      thumbnailFetchedAt: '',
-      pageCount: outline.pages.length,
-      pages: []
+function handleApiRequest_(e, method) {
+  try {
+    const request = parseApiRequest_(e, method);
+    assertClientKey_(request);
+    return jsonResponse_({
+      ok: true,
+      data: dispatchApiAction_(request)
     });
-    index[presentationId] = updatedAtMillis;
-  }
-
-  presentations.sort(function(a, b) {
-    return new Date(b.updatedAt) - new Date(a.updatedAt);
-  });
-
-  writeCache_(META_CACHE_KEY, presentations, META_CACHE_SECONDS);
-  writeCache_(META_INDEX_KEY, index, META_CACHE_SECONDS);
-  writeStoredMeta_(presentations);
-
-  return presentations;
-}
-
-function getPresentationOutline_(presentationId, knownUpdatedAtMillis) {
-  const updatedAtMillis = knownUpdatedAtMillis || String(DriveApp.getFileById(presentationId).getLastUpdated().getTime());
-  const cacheKey = 'outline_' + presentationId + '_' + updatedAtMillis;
-  const cached = readCache_(cacheKey);
-
-  if (cached) {
-    return cached;
-  }
-
-  const presentation = Slides.Presentations.get(presentationId);
-  const slides = presentation.slides || [];
-  const outline = {
-    presentationId: presentationId,
-    updatedAtMillis: updatedAtMillis,
-    pages: slides.map(function(slide, index) {
-      const speakerNote = extractSpeakerNote_(slide);
-      return {
-        pageObjectId: slide.objectId,
-        pageNumber: index + 1,
-        speakerNote: speakerNote,
-        hasSpeakerNote: speakerNote.trim().length > 0
-      };
-    })
-  };
-
-  writeCache_(cacheKey, outline, OUTLINE_CACHE_SECONDS);
-  return outline;
-}
-
-function getPresentationPage_(presentationId, outline, index) {
-  const page = outline.pages[index];
-  if (!page) {
-    throw new Error('Page index is out of range.');
-  }
-
-  const cacheKey = 'page_v3_' + presentationId + '_' + outline.updatedAtMillis + '_' + page.pageObjectId;
-  const cached = readCache_(cacheKey);
-
-  if (cached) {
-    return cached;
-  }
-
-  const hydrated = {
-    pageObjectId: page.pageObjectId,
-    pageNumber: page.pageNumber,
-    imageUrl: getSlideThumbnailUrl_(presentationId, page.pageObjectId),
-    speakerNote: page.speakerNote || '',
-    hasSpeakerNote: Boolean(page.hasSpeakerNote)
-  };
-
-  writeCache_(cacheKey, hydrated, THUMBNAIL_CACHE_SECONDS);
-  return hydrated;
-}
-
-function getSlidesFiles_() {
-  const folderId = PropertiesService.getScriptProperties().getProperty('SLIDES_FOLDER_ID') || DEFAULT_SLIDES_FOLDER_ID;
-  return folderId
-    ? DriveApp.getFolderById(folderId).getFilesByType(MimeType.GOOGLE_SLIDES)
-    : DriveApp.getFilesByType(MimeType.GOOGLE_SLIDES);
-}
-
-function getSlideThumbnailUrl_(presentationId, pageObjectId) {
-  const thumbnail = Slides.Presentations.Pages.getThumbnail(presentationId, pageObjectId, {
-    'thumbnailProperties.mimeType': 'PNG',
-    'thumbnailProperties.thumbnailSize': 'LARGE'
-  });
-
-  return thumbnail.contentUrl || '';
-}
-
-function extractSpeakerNote_(slide) {
-  const notesPage = slide.slideProperties && slide.slideProperties.notesPage;
-  const elements = notesPage && notesPage.pageElements ? notesPage.pageElements : [];
-  const chunks = [];
-
-  elements.forEach(function(element) {
-    const textElements = element.shape && element.shape.text && element.shape.text.textElements
-      ? element.shape.text.textElements
-      : [];
-
-    textElements.forEach(function(textElement) {
-      if (textElement.textRun && textElement.textRun.content) {
-        chunks.push(textElement.textRun.content);
+  } catch (error) {
+    return jsonResponse_({
+      ok: false,
+      error: {
+        message: error && error.message ? error.message : String(error)
       }
     });
-  });
-
-  return chunks.join('').trim();
-}
-
-function readCache_(key) {
-  const cached = CacheService.getScriptCache().get(key);
-  return cached ? JSON.parse(cached) : null;
-}
-
-function writeCache_(key, value, seconds) {
-  const serialized = JSON.stringify(value);
-  if (serialized.length <= CACHE_MAX_CHARS) {
-    CacheService.getScriptCache().put(key, serialized, seconds);
   }
 }
 
-function readStoredMeta_() {
-  const stored = PropertiesService.getScriptProperties().getProperty(META_CACHE_KEY);
-  return stored ? JSON.parse(stored) : [];
+function parseApiRequest_(e, method) {
+  const params = (e && e.parameter) || {};
+  let body = {};
+
+  if (method === 'POST' && e && e.postData && e.postData.contents) {
+    body = JSON.parse(e.postData.contents || '{}');
+  }
+
+  return {
+    method: method,
+    action: String(body.action || params.action || '').trim(),
+    clientKey: String(body.clientKey || params.clientKey || '').trim(),
+    params: params,
+    body: body
+  };
 }
 
-function writeStoredMeta_(presentations) {
-  const serialized = JSON.stringify(presentations);
-  if (serialized.length <= PROPERTY_MAX_CHARS) {
-    PropertiesService.getScriptProperties().setProperty(META_CACHE_KEY, serialized);
+function dispatchApiAction_(request) {
+  switch (request.action) {
+    case 'listPresentations':
+      return request.params.refresh === '1'
+        ? warmPresentationsCache()
+        : getPresentationsMeta();
+
+    case 'getFirstThumbnail':
+      return getPresentationFirstThumbnail(request.params.presentationId);
+
+    case 'getPageWindow':
+      return getPresentationPageWindow(
+        request.params.presentationId,
+        request.params.startIndex,
+        request.params.count
+      );
+
+    case 'requestGeneration':
+      return requestSlideGeneration(request.body);
+
+    case 'health':
+    case '':
+      return {
+        buildId: APP_BUILD_ID,
+        actions: [
+          'listPresentations',
+          'getFirstThumbnail',
+          'getPageWindow',
+          'requestGeneration'
+        ]
+      };
+
+    default:
+      throw new Error('Unknown action: ' + request.action);
   }
+}
+
+function assertClientKey_(request) {
+  const expected = PropertiesService.getScriptProperties().getProperty('CLIENT_KEY');
+  if (expected && request.clientKey !== expected) {
+    throw new Error('Invalid clientKey.');
+  }
+}
+
+function jsonResponse_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
 }
