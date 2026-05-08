@@ -10,3 +10,4 @@ token.json
 google-service-account.json
 google-oauth-credentials.json
 google-oauth-token.json
+.codex/skills/
