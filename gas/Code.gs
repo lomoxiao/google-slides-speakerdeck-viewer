@@ -8,11 +8,52 @@ const CACHE_MAX_CHARS = 90000;
 const PROPERTY_MAX_CHARS = 8000;
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
+const APP_BUILD_ID = 'phase3e-viewport-debug-20260508';
 
-function doGet() {
-  return HtmlService
-    .createTemplateFromFile('Index')
+function doGet(e) {
+  if (e && e.parameter && e.parameter.debug === 'force') {
+    return HtmlService
+      .createHtmlOutput(
+        '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">' +
+        '<pre style="font:16px/1.5 monospace;white-space:pre-wrap;padding:16px;">' +
+        'Slide Library forced debug\n' +
+        'serverBuild=' + APP_BUILD_ID + '\n' +
+        'requestedAt=' + new Date().toISOString() + '\n' +
+        'route=Code.gs doGet force\n' +
+        '</pre>'
+      )
+      .setTitle('Slide Library debug')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  const template = HtmlService.createTemplateFromFile('Index');
+  template.buildId = APP_BUILD_ID;
+  template.debugMode = Boolean(e && e.parameter && e.parameter.debug === '1');
+  template.debugRequestedAt = new Date().toISOString();
+  const output = template
     .evaluate()
+    .setTitle('Slide Library')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if (!template.debugMode) {
+    return output;
+  }
+
+  const marker =
+    '<aside id="serverDebugMarker" style="position:fixed;top:10px;left:10px;right:10px;z-index:9999;pointer-events:none;padding:12px;border:1px solid #d0d7de;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 18px 48px rgba(31,35,40,.22);color:#1f2328;font:12px/1.45 monospace;white-space:pre-wrap;">' +
+    '<strong style="display:block;margin-bottom:6px;font:700 14px/1.3 sans-serif;">Slide Library injected debug</strong>' +
+    'serverBuild=' + APP_BUILD_ID + '\n' +
+    'debugMode=true\n' +
+    'requestedAt=' + template.debugRequestedAt + '\n' +
+    'route=Code.gs injected into evaluated Index\n' +
+    'clientMetrics=waiting...' +
+    '</aside>' +
+    '<script>(function(){' +
+    'function pick(selector){var el=document.querySelector(selector);if(!el)return selector+": not found";var s=getComputedStyle(el);var r=el.getBoundingClientRect();return selector+" | font="+s.fontSize+" | line="+s.lineHeight+" | height="+(Math.round(r.height*10)/10)+"px | minHeight="+s.minHeight+" | display="+s.display;}' +
+    'function update(){var panel=document.getElementById("serverDebugMarker");if(!panel)return;var viewport=document.querySelector("meta[name=viewport]");var vv=window.visualViewport?Math.round(window.visualViewport.width)+"x"+Math.round(window.visualViewport.height):"n/a";var lines=["Slide Library injected debug","serverBuild=' + APP_BUILD_ID + '","debugMode=true","requestedAt=' + template.debugRequestedAt + '","route=Code.gs injected into evaluated Index","url="+location.href,"viewport="+(viewport?viewport.getAttribute("content"):""),"inner="+innerWidth+"x"+innerHeight,"visual="+vv,"docClient="+document.documentElement.clientWidth+"x"+document.documentElement.clientHeight,"ua="+navigator.userAgent,"bodyClass="+document.body.className,"htmlClass="+document.documentElement.className,"mobileClass="+document.body.classList.contains("mobile-layout"),"gasMobileFrameCandidate="+(document.body.classList.contains("mobile-layout")&&/script\\\\.googleusercontent\\\\.com|script\\\\.google\\\\.com/i.test(location.href)&&innerWidth>=900),pick(".generation-panel"),pick(".generation-head h2"),pick(".mode-tab"),pick(".field-box"),pick(".field-box span"),pick(".field-box input"),pick(".generation-details summary"),pick(".primary-button"),pick(".search-panel"),pick(".search-title-row h2"),pick(".search-box"),pick(".search-box input"),pick(".search-clear")];panel.textContent=lines.join("\\n");}' +
+    'window.addEventListener("load",function(){setTimeout(update,300);});window.addEventListener("resize",function(){setTimeout(update,100);});document.addEventListener("click",function(){setTimeout(update,250);},true);setTimeout(update,800);' +
+    '})();</script>';
+  return HtmlService
+    .createHtmlOutput(output.getContent().replace('<body', marker + '<body'))
     .setTitle('Slide Library')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

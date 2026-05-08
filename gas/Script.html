@@ -3,6 +3,7 @@ const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
 const GALLERY_PAGE_SIZE = 3;
 const MOBILE_GALLERY_PAGE_SIZE = 5;
+const BUILD_ID = "phase3e-viewport-debug-20260508";
 
 const state = {
   presentations: [],
@@ -43,6 +44,7 @@ const samplePresentations = [
 function init() {
   updateResponsiveMode();
   bindEvents();
+  updateDebugPanel();
   loadPresentations();
 }
 
@@ -59,6 +61,7 @@ function bindEvents() {
     setGenerationPanelOpen(false);
   });
   document.getElementById("searchToggle").addEventListener("click", toggleSearchPanel);
+  document.getElementById("mobileLibraryButton").addEventListener("click", showMobileLibraryHome);
   document.getElementById("mobileSearchButton").addEventListener("click", function() {
     setSearchPanelOpen(true);
   });
@@ -232,8 +235,9 @@ function renderGallery() {
 
 function createPresentationCard(presentation, displayRank) {
   const card = document.createElement("button");
+  const isFeatured = displayRank % getGalleryPageSize() === 0;
   card.type = "button";
-  card.className = "slide-card" + (displayRank % getGalleryPageSize() === 0 ? " is-featured" : " is-secondary");
+  card.className = "slide-card" + (isFeatured ? " is-featured" : " is-secondary");
   card.onclick = function() {
     openPresentation(presentation.id);
   };
@@ -243,10 +247,11 @@ function createPresentationCard(presentation, displayRank) {
       imageMarkup(presentation.thumbnailUrl, presentation.title) +
     '</div>' +
     '<div class="card-body">' +
+      (isFeatured ? '<span class="card-kicker">最新スライド</span>' : '') +
       '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
       '<div class="meta">' +
-        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
         '<span>' + formatDate(presentation.updatedAt) + '</span>' +
+        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
       '</div>' +
       renderSourceSlot(presentation) +
       '<span class="open-cue">開く</span>' +
@@ -764,6 +769,20 @@ function showGallery() {
   document.getElementById("galleryView").classList.add("is-visible");
 }
 
+function showMobileLibraryHome() {
+  setSearchPanelOpen(false);
+  setGenerationPanelOpen(false);
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput.value) {
+    searchInput.value = "";
+    filterPresentations("");
+  } else {
+    state.galleryPageIndex = 0;
+    renderGallery();
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function setNoteSheetOpen(isOpen) {
   state.isNoteSheetOpen = isOpen;
   const sheet = document.getElementById("mobileNoteSheet");
@@ -883,6 +902,7 @@ function handleFullscreenError() {
 function handleViewportChange() {
   updateViewerViewportHeight();
   updateResponsiveMode();
+  updateDebugPanel();
   if (state.isGenerationPanelOpen) {
     document.getElementById("generationSheetBackdrop").hidden = !isMobileViewport();
     document.body.classList.toggle("generation-sheet-open", isMobileViewport());
@@ -991,8 +1011,13 @@ function setGenerationPanelOpen(isOpen) {
   panel.hidden = !isOpen;
   backdrop.hidden = !isOpen || !isMobileViewport();
   document.body.classList.toggle("generation-sheet-open", isOpen && isMobileViewport());
+  const generationDetails = document.getElementById("generationDetails");
+  if (generationDetails && isOpen && isMobileViewport()) {
+    generationDetails.open = false;
+  }
   toggle.textContent = isOpen ? "閉じる" : "スライド生成";
   toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  updateDebugPanel();
 }
 
 function setGenerationMode(mode) {
@@ -1022,16 +1047,16 @@ function setSearchPanelOpen(isOpen) {
   document.body.classList.toggle("search-sheet-open", state.isSearchOpen && isMobileViewport());
   backdrop.hidden = !state.isSearchOpen || !isMobileViewport();
   document.getElementById("searchToggle").setAttribute("aria-expanded", state.isSearchOpen ? "true" : "false");
-  if (state.isSearchOpen) {
+  if (state.isSearchOpen && !isMobileViewport()) {
     window.setTimeout(function() {
       document.getElementById("searchInput").focus();
     }, 80);
   }
+  updateDebugPanel();
 }
 
 function isMobileViewport() {
-  const ua = navigator.userAgent || "";
-  const isIPhoneLike = /iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const isIPhoneLike = isIPhoneLikeViewport();
   const visualWidth = window.visualViewport && window.visualViewport.width
     ? window.visualViewport.width
     : window.innerWidth;
@@ -1042,6 +1067,11 @@ function isMobileViewport() {
   );
   const coarsePointer = window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
   return isIPhoneLike || layoutWidth <= 900 || (coarsePointer && layoutWidth <= 1180);
+}
+
+function isIPhoneLikeViewport() {
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 }
 
 function updateResponsiveMode() {
@@ -1060,6 +1090,59 @@ function updateResponsiveMode() {
     state.galleryPageIndex = 0;
     renderGallery();
   }
+}
+
+function updateDebugPanel() {
+  const panel = document.getElementById("debugPanel");
+  if (!panel) return;
+  const shouldShow = new URLSearchParams(window.location.search).get("debug") === "1";
+  panel.hidden = !shouldShow;
+  if (!shouldShow) return;
+
+  const readStyle = function(selector) {
+    const element = document.querySelector(selector);
+    if (!element) return selector + ": not found";
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return [
+      selector,
+      "font=" + style.fontSize,
+      "line=" + style.lineHeight,
+      "height=" + Math.round(rect.height * 10) / 10 + "px",
+      "minHeight=" + style.minHeight,
+      "display=" + style.display
+    ].join(" | ");
+  };
+
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  const visualSize = window.visualViewport
+    ? Math.round(window.visualViewport.width) + "x" + Math.round(window.visualViewport.height)
+    : "n/a";
+  const lines = [
+    "build=" + BUILD_ID,
+    "bodyBuild=" + (document.body.dataset.build || ""),
+    "url=" + window.location.href,
+    "viewportMeta=" + (viewportMeta ? viewportMeta.getAttribute("content") : ""),
+    "inner=" + window.innerWidth + "x" + window.innerHeight,
+    "visual=" + visualSize,
+    "docClient=" + document.documentElement.clientWidth + "x" + document.documentElement.clientHeight,
+    "ua=" + navigator.userAgent,
+    "mobile=" + isMobileViewport(),
+    "bodyClass=" + document.body.className,
+    "htmlClass=" + document.documentElement.className,
+    readStyle(".generation-head h2"),
+    readStyle(".mode-tab"),
+    readStyle(".field-box"),
+    readStyle(".field-box span"),
+    readStyle(".field-box input"),
+    readStyle(".generation-details summary"),
+    readStyle(".primary-button"),
+    readStyle(".search-title-row h2"),
+    readStyle(".search-box"),
+    readStyle(".search-box input"),
+    readStyle(".search-clear")
+  ];
+  panel.innerHTML = "<strong>Slide Library debug</strong>" + escapeHtml(lines.join("\n"));
 }
 
 function requestGeneration() {

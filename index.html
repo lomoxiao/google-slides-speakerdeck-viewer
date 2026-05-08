@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <base target="_top">
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#111111">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -573,6 +573,10 @@ h1 {
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.card-kicker {
+  display: none;
 }
 
 .meta {
@@ -1933,13 +1937,13 @@ body.mobile-layout .search-panel {
   z-index: 82;
   display: none;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  max-height: min(44vh, 360px);
+  gap: 14px;
+  max-height: min(56vh, 480px);
   overflow-y: auto;
   margin: 0;
-  padding: 8px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px));
   border: 1px solid var(--line);
-  border-radius: 18px 18px 0 0;
+  border-radius: 20px 20px 0 0;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 -18px 44px rgba(31, 35, 40, 0.2);
   backdrop-filter: blur(18px);
@@ -1960,13 +1964,20 @@ body.mobile-layout .search-title-row {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 body.mobile-layout .search-title-row h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 24px;
   line-height: 1.25;
+}
+
+body.mobile-layout .search-title-row .icon-button,
+body.mobile-layout .generation-head .icon-button {
+  width: 48px;
+  height: 48px;
+  font-size: 20px;
 }
 
 body.mobile-layout .search-toggle {
@@ -1976,21 +1987,32 @@ body.mobile-layout .search-toggle {
 body.mobile-layout .search-box {
   display: flex;
   width: 100%;
-  min-height: 48px;
-  padding: 10px 14px;
-  border-radius: 14px;
+  min-height: 64px;
+  padding: 13px 16px;
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 body.mobile-layout .search-box input {
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+body.mobile-layout input::placeholder,
+body.mobile-layout textarea::placeholder {
+  color: #8a929c;
+  opacity: 1;
 }
 
 body.mobile-layout .search-clear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 14px;
+  min-height: 64px;
+  padding: 0 16px;
+  border-radius: 18px;
+  font-size: 18px;
+  font-weight: 750;
 }
 
 body.mobile-layout .gallery-page-indicator {
@@ -2002,41 +2024,55 @@ body.mobile-layout .gallery-page-indicator {
 }
 
 body.mobile-layout .gallery {
-  gap: 8px;
+  gap: 12px;
 }
 
 body.mobile-layout .slide-card,
 body.mobile-layout .pending-card,
 body.mobile-layout .slide-card.is-featured {
-  display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  min-height: 94px;
-  border-radius: 10px;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-radius: 14px;
   text-align: left;
-  box-shadow: 0 1px 5px rgba(31, 35, 40, 0.04);
+  box-shadow: 0 8px 22px rgba(31, 35, 40, 0.07);
+  cursor: pointer;
 }
 
 body.mobile-layout .slide-card:hover,
 body.mobile-layout .slide-card:focus-visible {
   transform: none;
-  box-shadow: 0 4px 12px rgba(31, 35, 40, 0.08);
+  border-color: var(--line-strong);
+  box-shadow: 0 10px 26px rgba(31, 35, 40, 0.1);
 }
 
 body.mobile-layout .slide-card.is-featured,
 body.mobile-layout .pending-card.is-featured {
   grid-column: auto;
+  border-color: rgba(31, 122, 90, 0.18);
+  box-shadow: 0 12px 30px rgba(31, 35, 40, 0.1);
 }
 
 body.mobile-layout .card-thumb {
-  height: 100%;
-  min-height: 94px;
-  aspect-ratio: auto;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  border-bottom: 1px solid var(--line);
+  background: #eef0f2;
+}
+
+body.mobile-layout .slide-card.is-featured .card-thumb {
+  aspect-ratio: 16 / 9;
+}
+
+body.mobile-layout .card-thumb img {
+  object-fit: cover;
 }
 
 body.mobile-layout .image-fallback {
-  min-height: 94px;
-  padding: 8px;
-  font-size: 11px;
+  min-height: 0;
+  padding: 14px;
+  font-size: 12px;
 }
 
 body.mobile-layout .slide-card.is-featured .card-body,
@@ -2044,17 +2080,34 @@ body.mobile-layout .card-body {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  justify-content: center;
-  padding: 10px 12px;
+  justify-content: flex-start;
+  padding: 12px 13px 13px;
+}
+
+body.mobile-layout .slide-card.is-featured .card-body {
+  padding: 13px 14px 15px;
+}
+
+body.mobile-layout .card-kicker {
+  display: block;
+  width: fit-content;
+  margin: 0 0 7px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(31, 122, 90, 0.09);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 body.mobile-layout .slide-card.is-featured .card-title,
 body.mobile-layout .card-title {
   display: -webkit-box;
-  margin: 0 0 7px;
+  margin: 0 0 8px;
   overflow: hidden;
   font-size: 16px;
-  line-height: 1.28;
+  line-height: 1.34;
   font-weight: 750;
   text-align: left;
   white-space: normal;
@@ -2062,12 +2115,27 @@ body.mobile-layout .card-title {
   -webkit-box-orient: vertical;
 }
 
+body.mobile-layout .slide-card.is-featured .card-title {
+  font-size: 17px;
+  line-height: 1.34;
+}
+
 body.mobile-layout .meta {
   justify-content: flex-start;
-  gap: 8px;
+  gap: 9px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.3;
+}
+
+body.mobile-layout .meta span + span::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin: 0 9px 2px 0;
+  border-radius: 999px;
+  background: var(--line-strong);
 }
 
 body.mobile-layout .source-slot {
@@ -2076,6 +2144,20 @@ body.mobile-layout .source-slot {
 
 body.mobile-layout .open-cue {
   display: none;
+}
+
+@media (orientation: landscape) {
+  body.mobile-layout .gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.mobile-layout .slide-card.is-featured {
+    grid-column: auto;
+  }
+
+  body.mobile-layout .slide-card:not(.is-featured) .card-title {
+    -webkit-line-clamp: 2;
+  }
 }
 
 body.mobile-layout .gallery-pager {
@@ -2096,21 +2178,25 @@ body.mobile-layout .generation-status-panel {
 
 body.mobile-layout .generation-panel {
   display: grid;
-  gap: 12px;
-  max-height: min(72vh, 620px);
-  padding: 8px 14px calc(14px + env(safe-area-inset-bottom, 0px));
-  border-radius: 18px 18px 0 0;
+  gap: 16px;
+  max-height: min(82vh, 720px);
+  padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  border-radius: 20px 20px 0 0;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -18px 44px rgba(31, 35, 40, 0.2);
+  backdrop-filter: blur(18px);
 }
 
 body.mobile-layout .generation-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 10px;
+  gap: 10px 10px;
   align-items: center;
 }
 
 body.mobile-layout .generation-head h2 {
-  font-size: 18px;
+  font-size: 24px;
+  line-height: 1.25;
 }
 
 body.mobile-layout .generation-head p {
@@ -2121,28 +2207,45 @@ body.mobile-layout .generation-head .mode-tabs {
   grid-column: 1 / -1;
 }
 
+body.mobile-layout .mode-tabs {
+  min-height: 56px;
+  padding: 5px;
+}
+
+body.mobile-layout .mode-tab {
+  min-height: 56px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
 body.mobile-layout .field-grid,
 body.mobile-layout .option-grid {
-  gap: 8px;
+  gap: 12px;
 }
 
 body.mobile-layout .field-box {
-  min-height: 48px;
-  padding: 10px 14px;
-  border-radius: 14px;
+  min-height: 82px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px 15px;
+  border-radius: 18px;
 }
 
 body.mobile-layout .field-box span {
-  font-size: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 body.mobile-layout .field-box input,
 body.mobile-layout .field-box textarea {
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.4;
 }
 
 body.mobile-layout .field-box.is-textarea textarea {
-  min-height: 92px;
+  min-height: 150px;
 }
 
 .generation-details {
@@ -2173,21 +2276,28 @@ body.mobile-layout .field-box.is-textarea textarea {
 }
 
 body.mobile-layout .generation-details {
-  gap: 8px;
+  gap: 10px;
+}
+
+body.mobile-layout .generation-details summary {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 18px;
 }
 
 body.mobile-layout .generation-actions {
   position: sticky;
   bottom: 0;
-  margin: 0 -2px;
-  padding-top: 2px;
+  margin: 0 -4px;
+  padding: 8px 4px 0;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 30%);
 }
 
 body.mobile-layout .primary-button {
-  min-height: 50px;
+  min-height: 64px;
   margin-top: 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 750;
 }
 
@@ -2197,7 +2307,7 @@ body.mobile-layout .mobile-bottom-bar {
   bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 6px;
 }
@@ -2208,7 +2318,7 @@ body.mobile-layout .mobile-viewer-bar button {
   font-size: 14px;
 }
 
-body.mobile-layout .mobile-bottom-bar button:last-child {
+body.mobile-layout .mobile-bottom-bar button.is-active {
   background: var(--ink);
   color: #fff;
 }
@@ -2223,9 +2333,37 @@ body.mobile-layout .search-backdrop {
   z-index: 78;
 }
 
+.debug-panel {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 200;
+  max-height: min(45vh, 380px);
+  overflow: auto;
+  pointer-events: none;
+  padding: 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 48px rgba(31, 35, 40, 0.22);
+  color: #1f2328;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.debug-panel strong {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font);
+  font-size: 14px;
+}
+
 @media screen and (max-width: 1180px) {
   body.mobile-layout .mobile-bottom-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   body.mobile-layout.generation-sheet-open .mobile-bottom-bar,
@@ -2235,11 +2373,8 @@ body.mobile-layout .search-backdrop {
   }
 }
 </style>
-
-
-
 </head>
-<body>
+<body data-build="phase3e-viewport-debug-20260508">
   <main class="app">
     <section id="galleryView" class="gallery-view is-visible" aria-labelledby="galleryTitle">
       <div class="shell">
@@ -2355,6 +2490,7 @@ body.mobile-layout .search-backdrop {
           <button id="galleryNextButton" class="ghost-button" type="button">次へ</button>
         </nav>
         <nav class="mobile-bottom-bar" aria-label="モバイル操作">
+          <button id="mobileLibraryButton" class="is-active" type="button">ライブラリ</button>
           <button id="mobileSearchButton" type="button">検索</button>
           <button id="mobileCreateButton" type="button">作成</button>
         </nav>
@@ -2407,11 +2543,13 @@ body.mobile-layout .search-backdrop {
       </div>
     </section>
   </main>
+  <aside id="debugPanel" class="debug-panel" aria-label="Debug information" hidden></aside>
   <script>
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
 const GALLERY_PAGE_SIZE = 3;
 const MOBILE_GALLERY_PAGE_SIZE = 5;
+const BUILD_ID = "phase3e-viewport-debug-20260508";
 
 const state = {
   presentations: [],
@@ -2452,6 +2590,7 @@ const samplePresentations = [
 function init() {
   updateResponsiveMode();
   bindEvents();
+  updateDebugPanel();
   loadPresentations();
 }
 
@@ -2468,6 +2607,7 @@ function bindEvents() {
     setGenerationPanelOpen(false);
   });
   document.getElementById("searchToggle").addEventListener("click", toggleSearchPanel);
+  document.getElementById("mobileLibraryButton").addEventListener("click", showMobileLibraryHome);
   document.getElementById("mobileSearchButton").addEventListener("click", function() {
     setSearchPanelOpen(true);
   });
@@ -2641,8 +2781,9 @@ function renderGallery() {
 
 function createPresentationCard(presentation, displayRank) {
   const card = document.createElement("button");
+  const isFeatured = displayRank % getGalleryPageSize() === 0;
   card.type = "button";
-  card.className = "slide-card" + (displayRank % getGalleryPageSize() === 0 ? " is-featured" : " is-secondary");
+  card.className = "slide-card" + (isFeatured ? " is-featured" : " is-secondary");
   card.onclick = function() {
     openPresentation(presentation.id);
   };
@@ -2652,10 +2793,11 @@ function createPresentationCard(presentation, displayRank) {
       imageMarkup(presentation.thumbnailUrl, presentation.title) +
     '</div>' +
     '<div class="card-body">' +
+      (isFeatured ? '<span class="card-kicker">最新スライド</span>' : '') +
       '<h2 class="card-title">' + escapeHtml(presentation.title) + '</h2>' +
       '<div class="meta">' +
-        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
         '<span>' + formatDate(presentation.updatedAt) + '</span>' +
+        '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
       '</div>' +
       renderSourceSlot(presentation) +
       '<span class="open-cue">開く</span>' +
@@ -3173,6 +3315,20 @@ function showGallery() {
   document.getElementById("galleryView").classList.add("is-visible");
 }
 
+function showMobileLibraryHome() {
+  setSearchPanelOpen(false);
+  setGenerationPanelOpen(false);
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput.value) {
+    searchInput.value = "";
+    filterPresentations("");
+  } else {
+    state.galleryPageIndex = 0;
+    renderGallery();
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function setNoteSheetOpen(isOpen) {
   state.isNoteSheetOpen = isOpen;
   const sheet = document.getElementById("mobileNoteSheet");
@@ -3292,6 +3448,7 @@ function handleFullscreenError() {
 function handleViewportChange() {
   updateViewerViewportHeight();
   updateResponsiveMode();
+  updateDebugPanel();
   if (state.isGenerationPanelOpen) {
     document.getElementById("generationSheetBackdrop").hidden = !isMobileViewport();
     document.body.classList.toggle("generation-sheet-open", isMobileViewport());
@@ -3400,8 +3557,13 @@ function setGenerationPanelOpen(isOpen) {
   panel.hidden = !isOpen;
   backdrop.hidden = !isOpen || !isMobileViewport();
   document.body.classList.toggle("generation-sheet-open", isOpen && isMobileViewport());
+  const generationDetails = document.getElementById("generationDetails");
+  if (generationDetails && isOpen && isMobileViewport()) {
+    generationDetails.open = false;
+  }
   toggle.textContent = isOpen ? "閉じる" : "スライド生成";
   toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  updateDebugPanel();
 }
 
 function setGenerationMode(mode) {
@@ -3431,16 +3593,16 @@ function setSearchPanelOpen(isOpen) {
   document.body.classList.toggle("search-sheet-open", state.isSearchOpen && isMobileViewport());
   backdrop.hidden = !state.isSearchOpen || !isMobileViewport();
   document.getElementById("searchToggle").setAttribute("aria-expanded", state.isSearchOpen ? "true" : "false");
-  if (state.isSearchOpen) {
+  if (state.isSearchOpen && !isMobileViewport()) {
     window.setTimeout(function() {
       document.getElementById("searchInput").focus();
     }, 80);
   }
+  updateDebugPanel();
 }
 
 function isMobileViewport() {
-  const ua = navigator.userAgent || "";
-  const isIPhoneLike = /iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const isIPhoneLike = isIPhoneLikeViewport();
   const visualWidth = window.visualViewport && window.visualViewport.width
     ? window.visualViewport.width
     : window.innerWidth;
@@ -3451,6 +3613,11 @@ function isMobileViewport() {
   );
   const coarsePointer = window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
   return isIPhoneLike || layoutWidth <= 900 || (coarsePointer && layoutWidth <= 1180);
+}
+
+function isIPhoneLikeViewport() {
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
 }
 
 function updateResponsiveMode() {
@@ -3469,6 +3636,59 @@ function updateResponsiveMode() {
     state.galleryPageIndex = 0;
     renderGallery();
   }
+}
+
+function updateDebugPanel() {
+  const panel = document.getElementById("debugPanel");
+  if (!panel) return;
+  const shouldShow = new URLSearchParams(window.location.search).get("debug") === "1";
+  panel.hidden = !shouldShow;
+  if (!shouldShow) return;
+
+  const readStyle = function(selector) {
+    const element = document.querySelector(selector);
+    if (!element) return selector + ": not found";
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return [
+      selector,
+      "font=" + style.fontSize,
+      "line=" + style.lineHeight,
+      "height=" + Math.round(rect.height * 10) / 10 + "px",
+      "minHeight=" + style.minHeight,
+      "display=" + style.display
+    ].join(" | ");
+  };
+
+  const viewportMeta = document.querySelector('meta[name="viewport"]');
+  const visualSize = window.visualViewport
+    ? Math.round(window.visualViewport.width) + "x" + Math.round(window.visualViewport.height)
+    : "n/a";
+  const lines = [
+    "build=" + BUILD_ID,
+    "bodyBuild=" + (document.body.dataset.build || ""),
+    "url=" + window.location.href,
+    "viewportMeta=" + (viewportMeta ? viewportMeta.getAttribute("content") : ""),
+    "inner=" + window.innerWidth + "x" + window.innerHeight,
+    "visual=" + visualSize,
+    "docClient=" + document.documentElement.clientWidth + "x" + document.documentElement.clientHeight,
+    "ua=" + navigator.userAgent,
+    "mobile=" + isMobileViewport(),
+    "bodyClass=" + document.body.className,
+    "htmlClass=" + document.documentElement.className,
+    readStyle(".generation-head h2"),
+    readStyle(".mode-tab"),
+    readStyle(".field-box"),
+    readStyle(".field-box span"),
+    readStyle(".field-box input"),
+    readStyle(".generation-details summary"),
+    readStyle(".primary-button"),
+    readStyle(".search-title-row h2"),
+    readStyle(".search-box"),
+    readStyle(".search-box input"),
+    readStyle(".search-clear")
+  ];
+  panel.innerHTML = "<strong>Slide Library debug</strong>" + escapeHtml(lines.join("\n"));
 }
 
 function requestGeneration() {
@@ -3824,9 +4044,5 @@ function escapeHtml(value) {
 
 document.addEventListener("DOMContentLoaded", init);
 </script>
-
-
-
-
 </body>
 </html>
