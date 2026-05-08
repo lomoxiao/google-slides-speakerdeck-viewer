@@ -29,7 +29,9 @@
           >スライド生成</button>
         </header>
 
+        <div id="generationSheetBackdrop" class="sheet-backdrop" hidden></div>
         <form id="generationPanel" class="generation-panel" novalidate hidden>
+          <div class="sheet-handle" aria-hidden="true"></div>
           <div class="generation-head">
             <div>
               <h2>スライド生成</h2>
@@ -39,6 +41,7 @@
               <button id="urlModeButton" class="mode-tab is-active" type="button" role="tab" aria-selected="true" data-mode="url">URLから生成</button>
               <button id="researchModeButton" class="mode-tab" type="button" role="tab" aria-selected="false" data-mode="research">リサーチから生成</button>
             </div>
+            <button id="generationCloseButton" class="icon-button sheet-close" type="button" aria-label="閉じる">×</button>
           </div>
 
           <div id="urlFields" class="field-grid">
@@ -63,7 +66,9 @@
             </label>
           </div>
 
-          <div class="option-grid">
+          <details id="generationDetails" class="generation-details" open>
+            <summary>詳細設定</summary>
+            <div class="option-grid">
             <label class="field-box" for="audienceInput">
               <span>対象読者</span>
               <input id="audienceInput" type="text" placeholder="例: 経営層、開発者、営業向け" autocomplete="off">
@@ -76,7 +81,8 @@
               <span>重点テーマ</span>
               <input id="focusInput" type="text" placeholder="例: 日本市場への影響を中心に" autocomplete="off">
             </label>
-          </div>
+            </div>
+          </details>
 
           <div class="generation-actions">
             <button id="generationButton" class="primary-button" type="submit">生成を依頼</button>
@@ -84,11 +90,21 @@
           <p id="generationMessage" class="form-message" aria-live="polite"></p>
         </form>
 
-        <div class="search-panel">
+        <div id="searchSheetBackdrop" class="sheet-backdrop search-backdrop" hidden></div>
+        <div id="searchPanel" class="search-panel">
+          <div class="search-sheet-head">
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="search-title-row">
+              <h2>検索</h2>
+              <button id="searchCloseButton" class="icon-button" type="button" aria-label="検索を閉じる">×</button>
+            </div>
+          </div>
+          <button id="searchToggle" class="ghost-button search-toggle" type="button" aria-expanded="false" aria-controls="searchInput">検索</button>
           <label class="search-box" for="searchInput">
             <span aria-hidden="true">検索</span>
             <input id="searchInput" type="search" placeholder="タイトルで検索" autocomplete="off">
           </label>
+          <button id="searchClearButton" class="ghost-button search-clear" type="button">クリア</button>
           <p id="galleryPageIndicator" class="gallery-page-indicator"></p>
         </div>
 
@@ -102,11 +118,16 @@
 
         <div id="errorState" class="status" role="alert"></div>
         <div id="emptyState" class="status"></div>
+        <div id="generationStatusPanel" class="generation-status-panel" aria-live="polite" hidden></div>
         <div id="gallery" class="gallery" aria-live="polite"></div>
         <nav id="galleryPager" class="gallery-pager" aria-label="スライド一覧ページ送り" hidden>
           <button id="galleryPrevButton" class="ghost-button" type="button">前へ</button>
           <span id="galleryPagerText"></span>
           <button id="galleryNextButton" class="ghost-button" type="button">次へ</button>
+        </nav>
+        <nav class="mobile-bottom-bar" aria-label="モバイル操作">
+          <button id="mobileSearchButton" type="button">検索</button>
+          <button id="mobileCreateButton" type="button">作成</button>
         </nav>
       </div>
     </section>
@@ -138,6 +159,21 @@
             <div id="speakerNoteContent" class="note-content"></div>
           </aside>
         </div>
+        <div id="noteSheetBackdrop" class="sheet-backdrop note-backdrop" hidden></div>
+        <section id="mobileNoteSheet" class="mobile-note-sheet" aria-label="スピーカーノート" hidden>
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <div class="mobile-note-head">
+            <h3>Speaker Notes</h3>
+            <button id="noteSheetCloseButton" class="icon-button" type="button" aria-label="ノートを閉じる">×</button>
+          </div>
+          <div id="mobileNoteContent" class="note-content"></div>
+        </section>
+        <nav class="mobile-viewer-bar" aria-label="スライド操作">
+          <button type="button" onclick="showGallery()">戻る</button>
+          <button id="mobileNoteButton" type="button">ノート</button>
+          <span id="mobilePageIndicator"></span>
+          <button type="button" onclick="toggleViewerFullscreen()">全画面</button>
+        </nav>
         <div id="viewerToast" class="viewer-toast" role="status" aria-live="polite" hidden></div>
       </div>
     </section>

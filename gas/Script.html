@@ -2,6 +2,7 @@
 const INITIAL_PAGE_COUNT = 1;
 const PREFETCH_PAGE_COUNT = 3;
 const GALLERY_PAGE_SIZE = 3;
+const MOBILE_GALLERY_PAGE_SIZE = 5;
 
 const state = {
   presentations: [],
@@ -22,7 +23,11 @@ const state = {
   isPrefetching: false,
   generationMode: "url",
   isGenerationPanelOpen: false,
+  isSearchOpen: false,
+  pendingStatusTimer: null,
+  isNoteSheetOpen: false,
   galleryPageIndex: 0,
+  isMobileLayout: false,
   controlsIdleTimer: null,
   toastTimer: null,
   fullscreenRequestId: 0
@@ -36,6 +41,7 @@ const samplePresentations = [
 ];
 
 function init() {
+  updateResponsiveMode();
   bindEvents();
   loadPresentations();
 }
@@ -46,6 +52,41 @@ function bindEvents() {
   });
 
   document.getElementById("generationToggle").addEventListener("click", toggleGenerationPanel);
+  document.getElementById("generationCloseButton").addEventListener("click", function() {
+    setGenerationPanelOpen(false);
+  });
+  document.getElementById("generationSheetBackdrop").addEventListener("click", function() {
+    setGenerationPanelOpen(false);
+  });
+  document.getElementById("searchToggle").addEventListener("click", toggleSearchPanel);
+  document.getElementById("mobileSearchButton").addEventListener("click", function() {
+    setSearchPanelOpen(true);
+  });
+  document.getElementById("searchCloseButton").addEventListener("click", function() {
+    setSearchPanelOpen(false);
+  });
+  document.getElementById("searchSheetBackdrop").addEventListener("click", function() {
+    setSearchPanelOpen(false);
+  });
+  document.getElementById("searchClearButton").addEventListener("click", function() {
+    document.getElementById("searchInput").value = "";
+    filterPresentations("");
+    if (state.isSearchOpen) {
+      document.getElementById("searchInput").focus();
+    }
+  });
+  document.getElementById("mobileCreateButton").addEventListener("click", function() {
+    setGenerationPanelOpen(true);
+  });
+  document.getElementById("mobileNoteButton").addEventListener("click", function() {
+    setNoteSheetOpen(true);
+  });
+  document.getElementById("noteSheetCloseButton").addEventListener("click", function() {
+    setNoteSheetOpen(false);
+  });
+  document.getElementById("noteSheetBackdrop").addEventListener("click", function() {
+    setNoteSheetOpen(false);
+  });
 
   document.querySelectorAll(".mode-tab").forEach(function(button) {
     button.addEventListener("click", function() {
@@ -90,11 +131,23 @@ function bindEvents() {
   });
 
   document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape" && state.isGenerationPanelOpen) {
+      setGenerationPanelOpen(false);
+      return;
+    }
+    if (event.key === "Escape" && state.isSearchOpen) {
+      setSearchPanelOpen(false);
+      return;
+    }
     if (!state.currentPresentation) return;
     if (event.key === "ArrowRight") nextPage();
     if (event.key === "ArrowLeft") prevPage();
     if (event.key === "Escape") {
-      if (isViewerImmersive()) {
+      if (state.isNoteSheetOpen) {
+        setNoteSheetOpen(false);
+      } else if (state.isGenerationPanelOpen) {
+        setGenerationPanelOpen(false);
+      } else if (isViewerImmersive()) {
         exitViewerFullscreen();
       } else {
         showGallery();
@@ -151,23 +204,21 @@ function renderGallery() {
   const gallery = document.getElementById("gallery");
   gallery.innerHTML = "";
   hideError();
+  renderGenerationStatusPanel();
 
-  const items = state.pendingUrls.concat(state.filteredPresentations);
+  const items = state.filteredPresentations;
   const pageCount = getGalleryPageCount(items.length);
   state.galleryPageIndex = Math.min(state.galleryPageIndex, Math.max(pageCount - 1, 0));
-  const start = state.galleryPageIndex * GALLERY_PAGE_SIZE;
-  const visibleItems = items.slice(start, start + GALLERY_PAGE_SIZE);
+  const pageSize = getGalleryPageSize();
+  const start = state.galleryPageIndex * pageSize;
+  const visibleItems = items.slice(start, start + pageSize);
 
   visibleItems.forEach(function(item, index) {
     const displayRank = start + index;
-    if (typeof item === "string") {
-      gallery.appendChild(createPendingCard(item, displayRank));
-      return;
-    }
     gallery.appendChild(createPresentationCard(item, displayRank));
   });
 
-  if (!state.filteredPresentations.length && !state.pendingUrls.length) {
+  if (!state.filteredPresentations.length) {
     showEmpty("表示できるスライドがありません", "検索条件を変えるか、Drive の対象フォルダを確認してください。");
     renderGalleryPager(items.length);
     return;
@@ -182,7 +233,7 @@ function renderGallery() {
 function createPresentationCard(presentation, displayRank) {
   const card = document.createElement("button");
   card.type = "button";
-  card.className = "slide-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
+  card.className = "slide-card" + (displayRank % getGalleryPageSize() === 0 ? " is-featured" : " is-secondary");
   card.onclick = function() {
     openPresentation(presentation.id);
   };
@@ -197,13 +248,25 @@ function createPresentationCard(presentation, displayRank) {
         '<span>' + Number(presentation.pageCount || (presentation.pages || []).length || 0) + '枚</span>' +
         '<span>' + formatDate(presentation.updatedAt) + '</span>' +
       '</div>' +
+      renderSourceSlot(presentation) +
+      '<span class="open-cue">開く</span>' +
     '</div>';
 
   return card;
 }
 
+function renderSourceSlot(presentation) {
+  return presentation.sourceLabel
+    ? '<div class="source-slot">' + escapeHtml(presentation.sourceLabel) + '</div>'
+    : '';
+}
+
 function getGalleryPageCount(total) {
-  return Math.max(1, Math.ceil(total / GALLERY_PAGE_SIZE));
+  return Math.max(1, Math.ceil(total / getGalleryPageSize()));
+}
+
+function getGalleryPageSize() {
+  return isMobileViewport() ? MOBILE_GALLERY_PAGE_SIZE : GALLERY_PAGE_SIZE;
 }
 
 function renderGalleryPager(total) {
@@ -211,11 +274,12 @@ function renderGalleryPager(total) {
   const pagerText = document.getElementById("galleryPagerText");
   const indicator = document.getElementById("galleryPageIndicator");
   const pageCount = getGalleryPageCount(total);
+  const query = document.getElementById("searchInput").value.trim();
   const pageText = total
-    ? "Page " + (state.galleryPageIndex + 1) + " / " + pageCount
+    ? (query ? total + "件" : "Page " + (state.galleryPageIndex + 1) + " / " + pageCount)
     : "";
 
-  pager.hidden = total <= GALLERY_PAGE_SIZE;
+  pager.hidden = total <= getGalleryPageSize();
   pagerText.textContent = pageText;
   indicator.textContent = pageText;
   document.getElementById("galleryPrevButton").disabled = state.galleryPageIndex <= 0;
@@ -223,7 +287,7 @@ function renderGalleryPager(total) {
 }
 
 function changeGalleryPage(delta) {
-  const total = state.pendingUrls.length + state.filteredPresentations.length;
+  const total = state.filteredPresentations.length;
   const pageCount = getGalleryPageCount(total);
   state.galleryPageIndex = Math.max(0, Math.min(state.galleryPageIndex + delta, pageCount - 1));
   renderGallery();
@@ -258,7 +322,7 @@ function hydrateGalleryThumbnails(items, shouldRender) {
   const targets = items.filter(function(item) {
     return typeof item !== "string" && item.id && !item.thumbnailUrl && !item.isThumbnailLoading;
   });
-  targets.slice(0, shouldRender ? GALLERY_PAGE_SIZE : 6).forEach(function(presentation) {
+  targets.slice(0, shouldRender ? getGalleryPageSize() : 6).forEach(function(presentation) {
     presentation.isThumbnailLoading = true;
     google.script.run
       .withSuccessHandler(function(meta) {
@@ -297,18 +361,63 @@ function mergeSinglePresentationMeta(meta) {
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
 }
 
-function createPendingCard(label, displayRank) {
-  const card = document.createElement("article");
-  card.className = "pending-card" + (displayRank % GALLERY_PAGE_SIZE === 0 ? " is-featured" : " is-secondary");
-  card.innerHTML =
-    '<div class="card-thumb">' +
-      '<div class="pending-thumb"><div><div class="loader" aria-hidden="true"></div><strong>生成中...</strong></div></div>' +
+function renderGenerationStatusPanel() {
+  const panel = document.getElementById("generationStatusPanel");
+  if (!state.pendingUrls.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    stopPendingStatusTimer();
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML =
+    '<div class="status-panel-head">' +
+      '<div><strong>生成依頼を確認中</strong><span>新しいスライドが表示されるまで自動で確認します。</span></div>' +
+      '<span>' + state.pendingUrls.length + '件</span>' +
     '</div>' +
-    '<div class="card-body">' +
-      '<h2 class="card-title">' + escapeHtml(label) + '</h2>' +
-      '<div class="meta"><span>Slackに依頼済み</span><span>待機中</span></div>' +
-    '</div>';
-  return card;
+    state.pendingUrls.map(function(item) {
+      const status = getPendingStatus(item);
+      return '<article class="pending-row">' +
+        '<div class="pending-dot is-' + status.kind + '"></div>' +
+        '<div>' +
+          '<h2>' + escapeHtml(item.label) + '</h2>' +
+          '<p>' + escapeHtml(status.text) + '</p>' +
+        '</div>' +
+        '<time>' + formatElapsed(item.createdAt) + '</time>' +
+      '</article>';
+    }).join("");
+}
+
+function getPendingStatus(item) {
+  const elapsed = Date.now() - item.createdAt;
+  if (elapsed < 10000) {
+    return { kind: "sent", text: "送信済み" };
+  }
+  if (elapsed < 90000) {
+    return { kind: "waiting", text: "生成処理の開始を待っています" };
+  }
+  if (elapsed < 300000) {
+    return { kind: "checking", text: "ライブラリへの反映を確認しています" };
+  }
+  return { kind: "slow", text: "時間がかかっています。完了後に一覧へ表示されます" };
+}
+
+function startPendingStatusTimer() {
+  if (state.pendingStatusTimer) return;
+  state.pendingStatusTimer = window.setInterval(renderGenerationStatusPanel, 1000);
+}
+
+function stopPendingStatusTimer() {
+  if (!state.pendingStatusTimer) return;
+  window.clearInterval(state.pendingStatusTimer);
+  state.pendingStatusTimer = null;
+}
+
+function formatElapsed(startedAt) {
+  const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  if (seconds < 60) return seconds + "秒前";
+  return Math.floor(seconds / 60) + "分前";
 }
 
 function openPresentation(presentationId) {
@@ -508,6 +617,9 @@ function renderViewer() {
   document.getElementById("pageIndicator").textContent = total
     ? "Page " + (state.currentPageIndex + 1) + " / " + total
     : "No pages";
+  document.getElementById("mobilePageIndicator").textContent = total
+    ? (state.currentPageIndex + 1) + " / " + total
+    : "";
 
   document.getElementById("prevButton").disabled = state.currentPageIndex <= 0;
   document.getElementById("nextButton").disabled = state.currentPageIndex >= total - 1;
@@ -571,38 +683,40 @@ function renderPageStrip() {
 
 function renderSpeakerNote(fallbackMessage) {
   const noteContent = document.getElementById("speakerNoteContent");
+  const mobileNoteContent = document.getElementById("mobileNoteContent");
   const pages = state.currentPresentation ? state.currentPresentation.pages || [] : [];
   const page = pages[state.currentPageIndex];
+  let text = "";
 
   if (fallbackMessage) {
-    noteContent.textContent = fallbackMessage;
+    text = fallbackMessage;
+    noteContent.textContent = text;
+    mobileNoteContent.textContent = text;
     return;
   }
 
   if (page && !page.isLoaded) {
-    noteContent.textContent = "このページのスピーカーノートを読み込んでいます。";
+    text = "このページのスピーカーノートを読み込んでいます。";
+    noteContent.textContent = text;
+    mobileNoteContent.textContent = text;
     return;
   }
 
   if (page && page.hasSpeakerNote) {
-    noteContent.textContent = page.speakerNote || "";
+    text = page.speakerNote || "";
+    noteContent.textContent = text;
+    mobileNoteContent.textContent = text;
     return;
   }
 
-  noteContent.textContent = "このページにはスピーカーノートがありません。";
+  text = "このページにはスピーカーノートがありません。";
+  noteContent.textContent = text;
+  mobileNoteContent.textContent = text;
 }
 
 function renderSourceLink() {
   const sourceLink = document.getElementById("sourceLink");
-  const presentation = state.currentPresentation;
-  const url = presentation ? extractFirstUrl(presentation.description) || extractFirstUrl(presentation.title) : "";
-
-  if (!url) {
-    sourceLink.innerHTML = "";
-    return;
-  }
-
-  sourceLink.innerHTML = '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">元記事を開く</a>';
+  sourceLink.innerHTML = "";
 }
 
 function goToPage(index) {
@@ -640,6 +754,7 @@ function filterPresentationList(keyword) {
 
 function showGallery() {
   exitViewerFullscreen();
+  setNoteSheetOpen(false);
   state.currentPresentation = null;
   state.currentPageIndex = 0;
   state.pageWindowRequests = {};
@@ -647,6 +762,18 @@ function showGallery() {
   state.isPrefetching = false;
   document.getElementById("viewerView").classList.remove("is-visible");
   document.getElementById("galleryView").classList.add("is-visible");
+}
+
+function setNoteSheetOpen(isOpen) {
+  state.isNoteSheetOpen = isOpen;
+  const sheet = document.getElementById("mobileNoteSheet");
+  const backdrop = document.getElementById("noteSheetBackdrop");
+  sheet.hidden = !isOpen;
+  backdrop.hidden = !isOpen;
+  document.body.classList.toggle("note-sheet-open", isOpen);
+  if (isOpen) {
+    renderSpeakerNote();
+  }
 }
 
 function toggleSlideshow() {
@@ -755,6 +882,15 @@ function handleFullscreenError() {
 
 function handleViewportChange() {
   updateViewerViewportHeight();
+  updateResponsiveMode();
+  if (state.isGenerationPanelOpen) {
+    document.getElementById("generationSheetBackdrop").hidden = !isMobileViewport();
+    document.body.classList.toggle("generation-sheet-open", isMobileViewport());
+  }
+  if (state.isSearchOpen) {
+    document.getElementById("searchSheetBackdrop").hidden = !isMobileViewport();
+    document.body.classList.toggle("search-sheet-open", isMobileViewport());
+  }
   showOrientationHint();
 }
 
@@ -816,11 +952,11 @@ function hideViewerToast() {
 }
 
 function wakeViewerControls() {
-  if (!isViewerImmersive()) return;
+  if (!isViewerImmersive() && !(state.currentPresentation && isMobileViewport())) return;
   document.body.classList.remove("viewer-controls-idle");
   clearViewerControlsTimer();
   state.controlsIdleTimer = window.setTimeout(function() {
-    if (isViewerImmersive()) {
+    if (isViewerImmersive() || (state.currentPresentation && isMobileViewport())) {
       document.body.classList.add("viewer-controls-idle");
     }
   }, 2600);
@@ -845,10 +981,16 @@ function toggleGenerationPanel() {
 }
 
 function setGenerationPanelOpen(isOpen) {
+  if (isOpen && isMobileViewport()) {
+    setSearchPanelOpen(false);
+  }
   state.isGenerationPanelOpen = isOpen;
   const panel = document.getElementById("generationPanel");
   const toggle = document.getElementById("generationToggle");
+  const backdrop = document.getElementById("generationSheetBackdrop");
   panel.hidden = !isOpen;
+  backdrop.hidden = !isOpen || !isMobileViewport();
+  document.body.classList.toggle("generation-sheet-open", isOpen && isMobileViewport());
   toggle.textContent = isOpen ? "閉じる" : "スライド生成";
   toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
 }
@@ -864,6 +1006,60 @@ function setGenerationMode(mode) {
     button.setAttribute("aria-selected", active ? "true" : "false");
   });
   setGenerationMessage("");
+}
+
+function toggleSearchPanel() {
+  setSearchPanelOpen(!state.isSearchOpen);
+}
+
+function setSearchPanelOpen(isOpen) {
+  if (isOpen && isMobileViewport()) {
+    setGenerationPanelOpen(false);
+  }
+  state.isSearchOpen = isOpen;
+  const backdrop = document.getElementById("searchSheetBackdrop");
+  document.body.classList.toggle("mobile-search-open", state.isSearchOpen);
+  document.body.classList.toggle("search-sheet-open", state.isSearchOpen && isMobileViewport());
+  backdrop.hidden = !state.isSearchOpen || !isMobileViewport();
+  document.getElementById("searchToggle").setAttribute("aria-expanded", state.isSearchOpen ? "true" : "false");
+  if (state.isSearchOpen) {
+    window.setTimeout(function() {
+      document.getElementById("searchInput").focus();
+    }, 80);
+  }
+}
+
+function isMobileViewport() {
+  const ua = navigator.userAgent || "";
+  const isIPhoneLike = /iPhone|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+  const visualWidth = window.visualViewport && window.visualViewport.width
+    ? window.visualViewport.width
+    : window.innerWidth;
+  const layoutWidth = Math.min(
+    visualWidth || Number.POSITIVE_INFINITY,
+    document.documentElement.clientWidth || Number.POSITIVE_INFINITY,
+    window.innerWidth || Number.POSITIVE_INFINITY
+  );
+  const coarsePointer = window.matchMedia && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+  return isIPhoneLike || layoutWidth <= 900 || (coarsePointer && layoutWidth <= 1180);
+}
+
+function updateResponsiveMode() {
+  const enabled = isMobileViewport();
+  const changed = state.isMobileLayout !== enabled;
+  state.isMobileLayout = enabled;
+  document.documentElement.classList.toggle("mobile-layout", enabled);
+  document.body.classList.toggle("mobile-layout", enabled);
+  document.getElementById("searchSheetBackdrop").hidden = !state.isSearchOpen || !enabled;
+  document.body.classList.toggle("search-sheet-open", state.isSearchOpen && enabled);
+  const generationDetails = document.getElementById("generationDetails");
+  if (generationDetails && changed) {
+    generationDetails.open = !enabled;
+  }
+  if (changed && state.filteredPresentations.length) {
+    state.galleryPageIndex = 0;
+    renderGallery();
+  }
 }
 
 function requestGeneration() {
@@ -964,6 +1160,9 @@ function onGenerationRequested(label) {
   setGenerationMessage("生成依頼を送信しました。");
   clearGenerationInputs();
   addPendingCard(label);
+  if (isMobileViewport()) {
+    setGenerationPanelOpen(false);
+  }
   startPolling();
 }
 
@@ -988,16 +1187,20 @@ function setGenerationMessage(message, isError) {
 }
 
 function addPendingCard(url) {
-  if (state.pendingUrls.indexOf(url) === -1) {
-    state.pendingUrls.unshift(url);
+  if (!state.pendingUrls.some(function(item) { return item.label === url; })) {
+    state.pendingUrls.unshift({
+      label: url,
+      createdAt: Date.now()
+    });
   }
   state.galleryPageIndex = 0;
+  startPendingStatusTimer();
   renderGallery();
 }
 
 function removePendingCard(url) {
   state.pendingUrls = state.pendingUrls.filter(function(item) {
-    return item !== url;
+    return item.label !== url;
   });
   renderGallery();
   if (!state.pendingUrls.length) {
@@ -1057,16 +1260,9 @@ function mergePresentationMeta(presentations) {
     return presentation.id;
   }));
 
-  newItems.forEach(function(item) {
-    const sourceUrl = extractFirstUrl(item.description) || extractFirstUrl(item.title);
-    if (sourceUrl && state.pendingUrls.indexOf(sourceUrl) !== -1) {
-      state.pendingUrls = state.pendingUrls.filter(function(url) {
-        return url !== sourceUrl;
-      });
-    } else if (state.pendingUrls.length === 1) {
-      state.pendingUrls = [];
-    }
-  });
+  if (newItems.length && state.pendingUrls.length) {
+    state.pendingUrls.splice(0, Math.min(newItems.length, state.pendingUrls.length));
+  }
 
   state.filteredPresentations = filterPresentationList(document.getElementById("searchInput").value);
   state.galleryPageIndex = 0;
@@ -1091,6 +1287,21 @@ function completeLocalGeneration(url) {
 
 function showLoading(isVisible) {
   document.getElementById("loadingState").classList.toggle("is-visible", isVisible);
+  if (isVisible) {
+    renderGallerySkeleton();
+  }
+}
+
+function renderGallerySkeleton() {
+  const gallery = document.getElementById("gallery");
+  if (!gallery || gallery.children.length) return;
+  const count = getGalleryPageSize();
+  gallery.innerHTML = Array.from({ length: count }).map(function(_, index) {
+    return '<article class="slide-card skeleton-card' + (index === 0 ? ' is-featured' : ' is-secondary') + '">' +
+      '<div class="card-thumb"></div>' +
+      '<div class="card-body"><div class="skeleton-line is-title"></div><div class="skeleton-line"></div></div>' +
+    '</article>';
+  }).join("");
 }
 
 function showError(message) {
@@ -1176,11 +1387,6 @@ function sortPresentations(presentations) {
   return (presentations || []).slice().sort(function(a, b) {
     return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
-}
-
-function extractFirstUrl(value) {
-  const match = String(value || "").match(/https?:\/\/[^\s"'<>]+/i);
-  return match ? match[0] : "";
 }
 
 function formatDate(value) {
