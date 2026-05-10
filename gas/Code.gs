@@ -46,9 +46,7 @@ function parseApiRequest_(e, method) {
 function dispatchApiAction_(request) {
   switch (request.action) {
     case 'listPresentations':
-      return request.params.refresh === '1'
-        ? warmPresentationsCache()
-        : getPresentationsMeta();
+      return getPresentationsMeta(isRefreshRequest_(request));
 
     case 'getFirstThumbnail':
       return getPresentationFirstThumbnail(request.params.presentationId);
@@ -78,6 +76,15 @@ function dispatchApiAction_(request) {
     default:
       throw new Error('Unknown action: ' + request.action);
   }
+}
+
+function isRefreshRequest_(request) {
+  const refresh = String(
+    request.body.refresh === undefined || request.body.refresh === null
+      ? request.params.refresh || ''
+      : request.body.refresh
+  ).toLowerCase();
+  return refresh === '1' || refresh === 'true';
 }
 
 function assertClientKey_(request) {

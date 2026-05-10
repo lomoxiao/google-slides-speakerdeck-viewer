@@ -16,6 +16,7 @@ const state = {
   pollingTimer: null,
   knownIds: new Set(),
   isRequestingGeneration: false,
+  isRefreshingPresentations: false,
   touchStartX: null,
   touchStartY: null,
   pageWindowRequests: {},
@@ -133,6 +134,8 @@ function bindEvents() {
       document.getElementById("searchInput").focus();
     }
   });
+  document.getElementById("refreshButton").addEventListener("click", refreshPresentationsNow);
+  document.getElementById("mobileRefreshButton").addEventListener("click", refreshPresentationsNow);
   document.getElementById("mobileCreateButton").addEventListener("click", function() {
     setGenerationPanelOpen(true);
   });
@@ -260,6 +263,53 @@ function setPresentations(presentations) {
   }));
   showLoading(false);
   renderGallery();
+}
+
+function refreshPresentationsNow() {
+  if (state.isRefreshingPresentations) return;
+
+  state.isRefreshingPresentations = true;
+  hideError();
+  setRefreshButtonsLoading(true);
+
+  const complete = function() {
+    state.isRefreshingPresentations = false;
+    setRefreshButtonsLoading(false);
+  };
+
+  if (isGasRuntime()) {
+    apiClient.get("listPresentations", { refresh: "1" })
+      .then(function(presentations) {
+        mergePresentationMeta(presentations || []);
+        complete();
+      })
+      .catch(function() {
+        showError("最新化に失敗しました。時間をおいて再度お試しください。");
+        complete();
+      });
+    return;
+  }
+
+  window.setTimeout(function() {
+    mergePresentationMeta(samplePresentations);
+    complete();
+  }, 350);
+}
+
+function setRefreshButtonsLoading(isLoading) {
+  ["refreshButton", "mobileRefreshButton"].forEach(function(id) {
+    const button = document.getElementById(id);
+    if (!button) return;
+    if (isLoading) {
+      button.disabled = true;
+      button.dataset.label = button.textContent;
+      button.textContent = "最新化中...";
+      return;
+    }
+    button.disabled = false;
+    button.textContent = button.dataset.label || (id === "refreshButton" ? "↻ 最新化" : "最新化");
+    delete button.dataset.label;
+  });
 }
 
 function renderGallery() {

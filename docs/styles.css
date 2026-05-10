@@ -1715,7 +1715,7 @@ body.mobile-layout .card-thumb {
 body.mobile-layout .search-panel {
   position: static;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   gap: 10px;
   padding: 0 0 14px;
   background: transparent;
@@ -1751,7 +1751,7 @@ body.mobile-layout .mobile-bottom-bar {
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 6px;
   border: 1px solid rgba(215, 219, 224, 0.9);
@@ -1902,6 +1902,10 @@ body.mobile-layout .mobile-note-head {
   display: none;
 }
 
+.refresh-button {
+  white-space: nowrap;
+}
+
 /* Mobile density pass: keep desktop layout intact and override the earlier coarse mobile rules. */
 body.mobile-layout .app {
   padding: 10px 10px calc(64px + env(safe-area-inset-bottom, 0px));
@@ -1925,7 +1929,7 @@ body.mobile-layout .search-panel {
   bottom: 0;
   z-index: 82;
   display: none;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 14px;
   max-height: min(56vh, 480px);
   overflow-y: auto;
@@ -1994,6 +1998,17 @@ body.mobile-layout textarea::placeholder {
 }
 
 body.mobile-layout .search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 0 16px;
+  border-radius: 18px;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+body.mobile-layout .refresh-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2296,7 +2311,7 @@ body.mobile-layout .mobile-bottom-bar {
   bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 6px;
 }
@@ -2443,7 +2458,7 @@ body.mobile-layout .search-backdrop {
 
 @media screen and (max-width: 1180px) {
   body.mobile-layout .mobile-bottom-bar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   body.mobile-layout.generation-sheet-open .mobile-bottom-bar,

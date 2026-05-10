@@ -10,7 +10,11 @@ function getPresentations() {
   return getPresentationsMeta();
 }
 
-function getPresentationsMeta() {
+function getPresentationsMeta(refresh) {
+  if (refresh) {
+    return rebuildPresentationsMeta_(true);
+  }
+
   const cached = readCache_(META_CACHE_KEY);
   if (cached) {
     return cached;
@@ -102,7 +106,7 @@ function getPresentationFirstThumbnail(presentationId) {
 
 function rebuildPresentationsMeta_(forceRefresh) {
   const files = getSlidesFiles_();
-  const existingMeta = forceRefresh ? [] : readStoredMeta_();
+  const existingMeta = readStoredMeta_();
   const existingById = {};
   existingMeta.forEach(function(item) {
     existingById[item.id] = item;
