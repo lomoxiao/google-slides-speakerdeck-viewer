@@ -30,7 +30,11 @@ const state = {
   isMobileLayout: false,
   controlsIdleTimer: null,
   toastTimer: null,
-  fullscreenRequestId: 0
+  fullscreenRequestId: 0,
+  viewerTouchStartX: null,
+  viewerTouchStartY: null,
+  viewerTouchStartTarget: null,
+  isAutoImmersive: false
 };
 
 const samplePresentations = [
@@ -180,8 +184,13 @@ function bindEvents() {
   }, { passive: true });
 
   const viewer = document.getElementById("viewerView");
-  ["click", "touchstart", "mousemove"].forEach(function(eventName) {
-    viewer.addEventListener(eventName, wakeViewerControls, { passive: true });
+  viewer.addEventListener("touchstart", handleViewerTouchStart, { passive: true });
+  viewer.addEventListener("touchend", handleViewerTouchEnd, { passive: true });
+  ["click", "mousemove"].forEach(function(eventName) {
+    viewer.addEventListener(eventName, function(event) {
+      if (eventName === "click" && isCoarsePointer()) return;
+      wakeViewerControls();
+    }, { passive: true });
   });
 
   document.addEventListener("keydown", function(event) {
@@ -483,6 +492,7 @@ function openPresentation(presentationId) {
   document.getElementById("viewerView").classList.add("is-visible");
   ensurePagePlaceholders(presentation);
   renderViewerShell();
+  applyAutoImmersiveMode();
 
   if (isGasRuntime()) {
     renderViewer();
@@ -849,18 +859,14 @@ function toggleViewerFullscreen() {
   const fullscreenElement = getFullscreenElement();
 
   if (fullscreenElement || isViewerImmersive()) {
+    state.isAutoImmersive = false;
     exitViewerFullscreen();
     return;
   }
 
   state.fullscreenRequestId += 1;
   const requestId = state.fullscreenRequestId;
-  document.body.classList.add("viewer-immersive");
-  document.body.classList.remove("viewer-fullscreen-unavailable");
-  updateViewerViewportHeight();
-  syncFullscreenButton();
-  wakeViewerControls();
-  showOrientationHint();
+  enterViewerImmersive({ auto: false, wakeControls: true });
 
   const requestFullscreen = viewer.requestFullscreen ||
     viewer.webkitRequestFullscreen ||
@@ -903,6 +909,7 @@ function toggleViewerFullscreen() {
 
 function exitViewerFullscreen() {
   state.fullscreenRequestId += 1;
+  state.isAutoImmersive = false;
   clearViewerControlsTimer();
   hideViewerToast();
   document.body.classList.remove("viewer-immersive", "viewer-native-fullscreen", "viewer-fullscreen-unavailable", "viewer-controls-idle", "viewer-fullscreen");
@@ -956,6 +963,7 @@ function handleViewportChange() {
     document.getElementById("searchSheetBackdrop").hidden = !isMobileViewport();
     document.body.classList.toggle("search-sheet-open", isMobileViewport());
   }
+  applyAutoImmersiveMode();
   showOrientationHint();
 }
 
@@ -976,6 +984,58 @@ function getFullscreenElement() {
 
 function isViewerImmersive() {
   return document.body.classList.contains("viewer-immersive");
+}
+
+function isLandscapeViewport() {
+  const width = window.visualViewport && window.visualViewport.width
+    ? window.visualViewport.width
+    : window.innerWidth;
+  const height = window.visualViewport && window.visualViewport.height
+    ? window.visualViewport.height
+    : window.innerHeight;
+  if (width && height && width !== height) {
+    return width > height;
+  }
+  return window.matchMedia && window.matchMedia("(orientation: landscape)").matches;
+}
+
+function shouldAutoEnterImmersive() {
+  const viewer = document.getElementById("viewerView");
+  return Boolean(
+    state.currentPresentation &&
+    viewer &&
+    viewer.classList.contains("is-visible") &&
+    isMobileViewport() &&
+    isLandscapeViewport()
+  );
+}
+
+function enterViewerImmersive(options) {
+  const settings = options || {};
+  state.isAutoImmersive = Boolean(settings.auto);
+  document.body.classList.add("viewer-immersive");
+  document.body.classList.remove("viewer-fullscreen-unavailable");
+  updateViewerViewportHeight();
+  syncFullscreenButton();
+  if (settings.wakeControls) {
+    wakeViewerControls();
+  } else {
+    document.body.classList.add("viewer-controls-idle");
+  }
+  showOrientationHint();
+}
+
+function applyAutoImmersiveMode() {
+  if (shouldAutoEnterImmersive()) {
+    if (!isViewerImmersive()) {
+      enterViewerImmersive({ auto: true, wakeControls: true });
+    }
+    return;
+  }
+
+  if (state.isAutoImmersive && isViewerImmersive()) {
+    exitViewerFullscreen();
+  }
 }
 
 function markFullscreenUnavailable() {
@@ -1013,6 +1073,37 @@ function hideViewerToast() {
   window.clearTimeout(state.toastTimer);
   if (toast) {
     toast.hidden = true;
+  }
+}
+
+function handleViewerTouchStart(event) {
+  if (!state.currentPresentation || !event.changedTouches.length) return;
+  state.viewerTouchStartX = event.changedTouches[0].clientX;
+  state.viewerTouchStartY = event.changedTouches[0].clientY;
+  state.viewerTouchStartTarget = event.target;
+}
+
+function handleViewerTouchEnd(event) {
+  if (!state.currentPresentation || state.viewerTouchStartX === null || !event.changedTouches.length) return;
+
+  const startTarget = state.viewerTouchStartTarget;
+  const dx = event.changedTouches[0].clientX - state.viewerTouchStartX;
+  const dy = event.changedTouches[0].clientY - state.viewerTouchStartY;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+
+  state.viewerTouchStartX = null;
+  state.viewerTouchStartY = null;
+  state.viewerTouchStartTarget = null;
+
+  if (startTarget && startTarget.closest && startTarget.closest(".mobile-viewer-bar, .viewer-head, button, a, input, textarea")) {
+    return;
+  }
+  if (absX >= 40 && absX > absY) {
+    return;
+  }
+  if (dy >= 36 && absY > absX * 1.2) {
+    wakeViewerControls();
   }
 }
 
