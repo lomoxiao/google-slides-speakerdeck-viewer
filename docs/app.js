@@ -3,8 +3,6 @@ const PREFETCH_PAGE_COUNT = 3;
 const GALLERY_PAGE_SIZE = 3;
 const MOBILE_GALLERY_PAGE_SIZE = 5;
 const BUILD_ID = "github-pages-api-mvp-20260509";
-const URL_BASKET_STORAGE_KEY = "slidelibrary_research_basket_urls";
-const URL_BASKET_LIMIT = 3;
 
 const state = {
   presentations: [],
@@ -103,7 +101,6 @@ function init() {
   updateResponsiveMode();
   bindEvents();
   updateDebugPanel();
-  initializeUrlBasket();
   loadPresentations();
 }
 
@@ -169,19 +166,6 @@ function bindEvents() {
   document.getElementById("generationPanel").addEventListener("submit", function(event) {
     event.preventDefault();
     requestGeneration();
-  });
-
-  document.querySelectorAll(".url-remove-button").forEach(function(button) {
-    button.addEventListener("click", function(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      removeUrlAtIndex(Number(button.dataset.urlIndex || 0));
-    });
-  });
-
-  document.getElementById("urlBasketClearButton").addEventListener("click", function() {
-    clearUrlBasketAndInputs();
-    setGenerationMessage("URLをクリアしました。");
   });
 
   const slideFrame = document.getElementById("slideFrame");
@@ -1347,187 +1331,6 @@ function updateDebugPanel() {
   panel.innerHTML = "<strong>Slide Library debug</strong>" + escapeHtml(lines.join("\n"));
 }
 
-function initializeUrlBasket() {
-  applyBasketToUrlInputs();
-
-  const addUrl = parseAddUrlParam();
-  if (!addUrl) return;
-
-  const result = addUrlToBasket(addUrl);
-  applyBasketToUrlInputs();
-  setGenerationMode("url");
-  setGenerationPanelOpen(true);
-  setGenerationMessage(result.message, !result.ok);
-  removeAddUrlParamFromLocation();
-}
-
-function parseAddUrlParam() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const searchUrl = searchParams.get("addUrl");
-  if (searchUrl) return searchUrl;
-
-  const hash = window.location.hash || "";
-  const queryStart = hash.indexOf("?");
-  if (queryStart < 0) return "";
-  return new URLSearchParams(hash.slice(queryStart + 1)).get("addUrl") || "";
-}
-
-function removeAddUrlParamFromLocation() {
-  const searchParams = new URLSearchParams(window.location.search);
-  searchParams.delete("addUrl");
-  const nextSearch = searchParams.toString();
-
-  const hash = window.location.hash || "";
-  let nextHash = hash;
-  const queryStart = hash.indexOf("?");
-  if (queryStart >= 0) {
-    const hashPath = hash.slice(0, queryStart);
-    const hashParams = new URLSearchParams(hash.slice(queryStart + 1));
-    hashParams.delete("addUrl");
-    const hashQuery = hashParams.toString();
-    nextHash = hashPath + (hashQuery ? "?" + hashQuery : "");
-  }
-
-  const nextUrl = window.location.pathname + (nextSearch ? "?" + nextSearch : "") + nextHash;
-  window.history.replaceState({}, "", nextUrl);
-}
-
-function normalizeBasketUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return null;
-
-  const candidates = [raw];
-  try {
-    const decoded = decodeURIComponent(raw);
-    if (decoded !== raw) candidates.push(decoded);
-  } catch (error) {
-    // Keep the original value if it was already decoded or partially encoded.
-  }
-
-  for (let index = 0; index < candidates.length; index += 1) {
-    try {
-      const parsed = new URL(candidates[index].trim());
-      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-        return parsed.href;
-      }
-    } catch (error) {
-      // Try the next candidate.
-    }
-  }
-  return null;
-}
-
-function loadBasketUrls() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(URL_BASKET_STORAGE_KEY) || "[]");
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(function(item) {
-        return {
-          url: normalizeBasketUrl(item && item.url),
-          addedAt: item && item.addedAt ? String(item.addedAt) : new Date().toISOString()
-        };
-      })
-      .filter(function(item) { return Boolean(item.url); })
-      .slice(0, URL_BASKET_LIMIT);
-  } catch (error) {
-    return [];
-  }
-}
-
-function saveBasketUrls(items) {
-  const normalized = (items || [])
-    .map(function(item) {
-      const url = normalizeBasketUrl(item && item.url);
-      return url ? { url: url, addedAt: item.addedAt || new Date().toISOString() } : null;
-    })
-    .filter(Boolean)
-    .slice(0, URL_BASKET_LIMIT);
-
-  try {
-    window.localStorage.setItem(URL_BASKET_STORAGE_KEY, JSON.stringify(normalized));
-  } catch (error) {
-    // localStorage can be unavailable in restricted browser modes.
-  }
-  return normalized;
-}
-
-function getFormUrlValues() {
-  return [1, 2, 3].map(function(index) {
-    return document.getElementById("urlInput" + index).value.trim();
-  }).filter(Boolean);
-}
-
-function getRawFormUrlValues() {
-  return [1, 2, 3].map(function(index) {
-    return document.getElementById("urlInput" + index).value.trim();
-  });
-}
-
-function applyUrlsToUrlInputs(urls) {
-  [1, 2, 3].forEach(function(index) {
-    const input = document.getElementById("urlInput" + index);
-    if (input) input.value = urls[index - 1] || "";
-  });
-}
-
-function applyBasketToUrlInputs() {
-  applyUrlsToUrlInputs(loadBasketUrls().map(function(item) { return item.url; }));
-}
-
-function addUrlToBasket(value) {
-  const url = normalizeBasketUrl(value);
-  if (!url) {
-    return { ok: false, message: "不正なURLです。httpまたはhttpsのURLを指定してください。" };
-  }
-
-  const items = loadBasketUrls();
-  if (items.some(function(item) { return item.url === url; })) {
-    return { ok: false, message: "このURLはすでに追加済みです。" };
-  }
-  if (items.length >= URL_BASKET_LIMIT) {
-    return { ok: false, message: "URLは最大3件までです。不要なURLを削除してから追加してください。" };
-  }
-
-  items.push({ url: url, addedAt: new Date().toISOString() });
-  saveBasketUrls(items);
-  return { ok: true, message: "URLを追加しました。" };
-}
-
-function syncBasketFromUrlInputs() {
-  const items = getFormUrlValues().map(function(url) {
-    return { url: url, addedAt: new Date().toISOString() };
-  });
-  saveBasketUrls(items);
-}
-
-function removeUrlAtIndex(index) {
-  const rawUrls = getRawFormUrlValues();
-  if (index < 0 || index >= URL_BASKET_LIMIT || !rawUrls[index]) {
-    setGenerationMessage("削除するURLがありません。", true);
-    return;
-  }
-
-  rawUrls.splice(index, 1);
-  const urls = rawUrls.filter(Boolean);
-  applyUrlsToUrlInputs(urls);
-  syncBasketFromUrlInputs();
-  setGenerationMessage("URLを削除しました。");
-}
-
-function clearUrlBasket() {
-  try {
-    window.localStorage.removeItem(URL_BASKET_STORAGE_KEY);
-  } catch (error) {
-    // Ignore storage errors; the visible form state is still cleared.
-  }
-}
-
-function clearUrlBasketAndInputs() {
-  clearUrlBasket();
-  applyUrlsToUrlInputs([]);
-}
-
 function requestGeneration() {
   const payloadResult = collectGenerationPayload();
 
@@ -1619,7 +1422,6 @@ function createPendingLabel(payload) {
 function onGenerationRequested(label, trackingId) {
   setGenerationSubmitting(false);
   setGenerationMessage("生成依頼をSlackへ送信しました。完了通知はSlackをご確認ください。");
-  clearUrlBasket();
   clearGenerationInputs();
   addPendingCard(label, trackingId);
   if (isMobileViewport()) {

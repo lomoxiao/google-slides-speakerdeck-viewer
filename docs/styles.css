@@ -252,23 +252,6 @@ h1 {
   font-size: 16px;
 }
 
-.url-remove-button {
-  flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.76);
-  color: var(--muted);
-  font: inherit;
-  font-size: 13px;
-}
-
-.url-remove-button:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
 .field-box textarea {
   resize: vertical;
   line-height: 1.6;
@@ -276,14 +259,7 @@ h1 {
 
 .generation-actions {
   display: flex;
-  gap: 10px;
   justify-content: flex-end;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.url-clear-button {
-  min-height: 48px;
 }
 
 .primary-button {
@@ -2270,12 +2246,6 @@ body.mobile-layout .field-box input,
 body.mobile-layout .field-box textarea {
   font-size: 20px;
   line-height: 1.4;
-}
-
-body.mobile-layout .url-remove-button {
-  align-self: flex-end;
-  min-height: 38px;
-  font-size: 15px;
 }
 
 body.mobile-layout .field-box.is-textarea textarea {
