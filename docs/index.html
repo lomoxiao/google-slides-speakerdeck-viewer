@@ -47,14 +47,17 @@
             <label class="field-box" for="urlInput1">
               <span>URL 1</span>
               <input id="urlInput1" type="url" placeholder="https://example.com/article" autocomplete="url">
+              <button class="url-remove-button" type="button" data-url-index="0" aria-label="URL 1を削除">削除</button>
             </label>
             <label class="field-box" for="urlInput2">
               <span>URL 2</span>
               <input id="urlInput2" type="url" placeholder="任意: https://example.com/report" autocomplete="off">
+              <button class="url-remove-button" type="button" data-url-index="1" aria-label="URL 2を削除">削除</button>
             </label>
             <label class="field-box" for="urlInput3">
               <span>URL 3</span>
               <input id="urlInput3" type="url" placeholder="任意: https://example.com/source" autocomplete="off">
+              <button class="url-remove-button" type="button" data-url-index="2" aria-label="URL 3を削除">削除</button>
             </label>
           </div>
 
@@ -84,6 +87,7 @@
           </details>
 
           <div class="generation-actions">
+            <button id="urlBasketClearButton" class="ghost-button url-clear-button" type="button">URLをクリア</button>
             <button id="generationButton" class="primary-button" type="submit">生成を依頼</button>
           </div>
           <p id="generationMessage" class="form-message" aria-live="polite"></p>
