@@ -101,6 +101,7 @@ function init() {
   updateResponsiveMode();
   bindEvents();
   updateDebugPanel();
+  prefillGenerationFromNewsParams();
   loadPresentations();
 }
 
@@ -1448,6 +1449,49 @@ function setGenerationMessage(message, isError) {
   const messageNode = document.getElementById("generationMessage");
   messageNode.textContent = message || "";
   messageNode.classList.toggle("is-error", Boolean(isError));
+}
+
+function prefillGenerationFromNewsParams() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("from") !== "news") return;
+
+  const keyword = params.get("keyword") || "";
+  const prompt = params.get("prompt") || "";
+  const url = params.get("url") || "";
+  const title = params.get("title") || "";
+  const source = params.get("source") || "";
+  const summary = params.get("summary") || "";
+
+  const urlInput = document.getElementById("urlInput1");
+  const focusInput = document.getElementById("focusInput");
+  const researchPromptInput = document.getElementById("researchPromptInput");
+
+  if (urlInput && url) {
+    urlInput.value = url;
+  }
+  if (focusInput && keyword) {
+    focusInput.value = keyword;
+  }
+  if (researchPromptInput && (keyword || prompt || summary)) {
+    const researchParts = [];
+    if (keyword) researchParts.push(keyword);
+    if (prompt) researchParts.push(prompt);
+    let researchText = researchParts.join(" - ");
+    if (summary) {
+      researchText += (researchText ? "\n\n" : "") + "参照記事要約:\n" + summary;
+    }
+    researchPromptInput.value = researchText.trim();
+  }
+
+  setGenerationMode(url ? "url" : "research");
+  setGenerationPanelOpen(true);
+
+  if (title || source) {
+    setGenerationMessage("参照元: " + [title, source].filter(Boolean).join(" / "));
+  }
+
+  const cleanUrl = window.location.pathname + window.location.hash;
+  window.history.replaceState({}, "", cleanUrl);
 }
 
 function addPendingCard(url, trackingId) {
