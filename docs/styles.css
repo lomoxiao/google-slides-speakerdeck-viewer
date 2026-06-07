@@ -216,6 +216,42 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.manga-option {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.manga-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.manga-toggle input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.manga-style select {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.manga-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-light);
+}
+
 .field-box,
 .search-box {
   display: flex;

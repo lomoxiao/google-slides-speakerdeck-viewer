@@ -155,6 +155,10 @@ function bindEvents() {
     });
   });
 
+  document.getElementById("mangaToggle").addEventListener("change", function() {
+    document.getElementById("mangaArtStyleField").hidden = !this.checked;
+  });
+
   document.getElementById("galleryPrevButton").addEventListener("click", function() {
     changeGalleryPage(-1);
   });
@@ -1372,7 +1376,9 @@ function collectGenerationPayload() {
     researchPrompt: "",
     audience: document.getElementById("audienceInput").value.trim(),
     focus: document.getElementById("focusInput").value.trim(),
-    pages: document.getElementById("pagesInput").value.trim()
+    pages: document.getElementById("pagesInput").value.trim(),
+    manga: document.getElementById("mangaToggle").checked,
+    mangaArtStyle: document.getElementById("mangaArtStyleSelect").value
   };
 
   if (state.generationMode === "research") {
@@ -1399,6 +1405,10 @@ function collectGenerationPayload() {
     return { ok: false, message: "目標スライド数は整数で入力してください。" };
   }
 
+  if (payload.manga && state.generationMode === "research") {
+    return { ok: false, message: "漫画生成は「URLから生成」時のみ利用できます。" };
+  }
+
   return {
     ok: true,
     payload: {
@@ -1407,7 +1417,9 @@ function collectGenerationPayload() {
       researchPrompt: payload.researchPrompt,
       audience: payload.audience,
       focus: payload.focus,
-      pages: payload.pages ? Number(payload.pages) : undefined
+      pages: payload.pages ? Number(payload.pages) : undefined,
+      manga: payload.manga,
+      mangaArtStyle: payload.manga ? payload.mangaArtStyle : undefined
     }
   };
 }
@@ -1435,6 +1447,10 @@ function clearGenerationInputs() {
     const node = document.getElementById(id);
     if (node) node.value = "";
   });
+  const mangaToggle = document.getElementById("mangaToggle");
+  if (mangaToggle) mangaToggle.checked = false;
+  const mangaArtStyleField = document.getElementById("mangaArtStyleField");
+  if (mangaArtStyleField) mangaArtStyleField.hidden = true;
 }
 
 function setGenerationSubmitting(isSubmitting) {

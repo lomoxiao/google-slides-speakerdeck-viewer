@@ -1,7 +1,6 @@
 function requestSlideGeneration(input) {
   const payload = normalizeGenerationPayload_(input || {});
   const trackingId = createTrackingId_();
-  const messageText = buildSlideGenerationMessage_(payload, trackingId);
 
   const properties = PropertiesService.getScriptProperties();
   const token = properties.getProperty('SLACK_BOT_TOKEN');
@@ -14,6 +13,24 @@ function requestSlideGeneration(input) {
     throw new Error('SLACK_COMPLETION_CHANNEL_ID is not set.');
   }
 
+  // スライド生成コマンドを投稿。
+  const slideTs = postSlackText_(token, channelId, buildSlideGenerationMessage_(payload, trackingId));
+
+  // 漫画も依頼された場合は、独立したコマンドとして [manga-generate] を別途投稿する。
+  // スライドと漫画は完全に独立したジョブ(片方の失敗が他方に影響しない)。
+  let mangaTs = '';
+  if (payload.manga) {
+    mangaTs = postSlackText_(token, channelId, buildMangaGenerationCommand_(payload));
+  }
+
+  return {
+    trackingId: trackingId,
+    slackTs: slideTs,
+    mangaSlackTs: mangaTs
+  };
+}
+
+function postSlackText_(token, channelId, text) {
   const response = UrlFetchApp.fetch('https://slack.com/api/chat.postMessage', {
     method: 'post',
     contentType: 'application/json',
@@ -22,7 +39,7 @@ function requestSlideGeneration(input) {
     },
     payload: JSON.stringify({
       channel: channelId,
-      text: messageText
+      text: text
     }),
     muteHttpExceptions: true
   });
@@ -32,10 +49,7 @@ function requestSlideGeneration(input) {
     throw new Error('Slack post failed: ' + (body.error || response.getResponseCode()));
   }
 
-  return {
-    trackingId: trackingId,
-    slackTs: body.ts || ''
-  };
+  return body.ts || '';
 }
 
 function normalizeGenerationPayload_(input) {
@@ -50,6 +64,8 @@ function normalizeGenerationPayload_(input) {
   const pages = payload.pages === undefined || payload.pages === null || payload.pages === ''
     ? ''
     : String(payload.pages).trim();
+  const manga = Boolean(payload.manga);
+  const mangaArtStyle = String(payload.mangaArtStyle || '').trim().toUpperCase();
 
   if (urls.length && researchPrompt) {
     throw new Error('URL and researchPrompt cannot be specified together.');
@@ -66,6 +82,12 @@ function normalizeGenerationPayload_(input) {
   if (pages && !/^\d+$/.test(pages)) {
     throw new Error('pages must be an integer.');
   }
+  if (manga && !urls.length) {
+    throw new Error('Manga generation requires at least one URL.');
+  }
+  if (manga && mangaArtStyle && !/^[A-G]$/.test(mangaArtStyle)) {
+    throw new Error('mangaArtStyle must be one of A-G.');
+  }
 
   return {
     mode: mode,
@@ -73,7 +95,9 @@ function normalizeGenerationPayload_(input) {
     researchPrompt: researchPrompt,
     audience: audience,
     focus: focus,
-    pages: pages
+    pages: pages,
+    manga: manga,
+    mangaArtStyle: mangaArtStyle
   };
 }
 
@@ -99,6 +123,26 @@ function buildSlideGenerationCommand_(payload) {
   }
   if (payload.pages) {
     args.push('--pages', payload.pages);
+  }
+  return args.join(' ');
+}
+
+function buildMangaGenerationCommand_(payload) {
+  // 漫画は1記事=1作品。スライドが複数 URL でも先頭 URL を素材にする。
+  // pages はスライドと共有(目標スライド数=総見開き数)。画風・treatment は未指定なら Worker 側の既定(F/B)。
+  const args = ['[manga-generate]'];
+  args.push('--url', payload.urls[0]);
+  if (payload.pages) {
+    args.push('--pages', payload.pages);
+  }
+  if (payload.mangaArtStyle) {
+    args.push('--art-style', payload.mangaArtStyle);
+  }
+  if (payload.audience) {
+    args.push('--audience', quoteArg_(payload.audience));
+  }
+  if (payload.focus) {
+    args.push('--focus', quoteArg_(payload.focus));
   }
   return args.join(' ');
 }

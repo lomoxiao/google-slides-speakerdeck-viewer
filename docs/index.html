@@ -83,6 +83,26 @@
             </div>
           </details>
 
+          <div class="manga-option">
+            <label class="manga-toggle" for="mangaToggle">
+              <input id="mangaToggle" type="checkbox">
+              <span>漫画も生成する（NotebookLM 用ネームを作成）</span>
+            </label>
+            <label class="field-box manga-style" id="mangaArtStyleField" for="mangaArtStyleSelect" hidden>
+              <span>漫画の画風</span>
+              <select id="mangaArtStyleSelect">
+                <option value="A">A 王道少年漫画</option>
+                <option value="B">B 少女漫画</option>
+                <option value="C">C 4コマギャグ</option>
+                <option value="D">D 青年劇画</option>
+                <option value="E">E アメコミ</option>
+                <option value="F" selected>F 絵本風</option>
+                <option value="G">G レトロ昭和漫画</option>
+              </select>
+            </label>
+            <p class="manga-note">※ 漫画生成は「URLから生成」時のみ。スライドとは別に依頼され、完了はSlackへ個別通知されます。</p>
+          </div>
+
           <div class="generation-actions">
             <button id="generationButton" class="primary-button" type="submit">生成を依頼</button>
           </div>
