@@ -13,11 +13,11 @@ function requestSlideGeneration(input) {
     throw new Error('SLACK_COMPLETION_CHANNEL_ID is not set.');
   }
 
-  // スライド生成コマンドを投稿。
-  const slideTs = postSlackText_(token, channelId, buildSlideGenerationMessage_(payload, trackingId));
+  let slideTs = '';
+  if (payload.slides) {
+    slideTs = postSlackText_(token, channelId, buildSlideGenerationMessage_(payload, trackingId));
+  }
 
-  // 漫画も依頼された場合は、独立したコマンドとして [manga-generate] を別途投稿する。
-  // スライドと漫画は完全に独立したジョブ(片方の失敗が他方に影響しない)。
   let mangaTs = '';
   if (payload.manga) {
     mangaTs = postSlackText_(token, channelId, buildMangaGenerationCommand_(payload));
@@ -64,9 +64,17 @@ function normalizeGenerationPayload_(input) {
   const pages = payload.pages === undefined || payload.pages === null || payload.pages === ''
     ? ''
     : String(payload.pages).trim();
+  const slides = payload.slides === undefined || payload.slides === null
+    ? true
+    : Boolean(payload.slides);
   const manga = Boolean(payload.manga);
   const mangaArtStyle = String(payload.mangaArtStyle || '').trim().toUpperCase();
+  const mangaTreatment = String(payload.mangaTreatment || '').trim().toUpperCase();
+  const mangaGenre = String(payload.mangaGenre || '').trim();
 
+  if (!slides && !manga) {
+    throw new Error('Select at least one generation target.');
+  }
   if (urls.length && researchPrompt) {
     throw new Error('URL and researchPrompt cannot be specified together.');
   }
@@ -88,6 +96,9 @@ function normalizeGenerationPayload_(input) {
   if (manga && mangaArtStyle && !/^[A-G]$/.test(mangaArtStyle)) {
     throw new Error('mangaArtStyle must be one of A-G.');
   }
+  if (manga && mangaTreatment && !/^[A-C]$/.test(mangaTreatment)) {
+    throw new Error('mangaTreatment must be one of A-C.');
+  }
 
   return {
     mode: mode,
@@ -96,8 +107,11 @@ function normalizeGenerationPayload_(input) {
     audience: audience,
     focus: focus,
     pages: pages,
+    slides: slides,
     manga: manga,
-    mangaArtStyle: mangaArtStyle
+    mangaArtStyle: mangaArtStyle,
+    mangaTreatment: mangaTreatment,
+    mangaGenre: mangaGenre
   };
 }
 
@@ -128,8 +142,6 @@ function buildSlideGenerationCommand_(payload) {
 }
 
 function buildMangaGenerationCommand_(payload) {
-  // 漫画は1記事=1作品。スライドが複数 URL でも先頭 URL を素材にする。
-  // pages はスライドと共有(目標スライド数=総見開き数)。画風・treatment は未指定なら Worker 側の既定(F/B)。
   const args = ['[manga-generate]'];
   args.push('--url', payload.urls[0]);
   if (payload.pages) {
@@ -137,6 +149,12 @@ function buildMangaGenerationCommand_(payload) {
   }
   if (payload.mangaArtStyle) {
     args.push('--art-style', payload.mangaArtStyle);
+  }
+  if (payload.mangaTreatment) {
+    args.push('--treatment', payload.mangaTreatment);
+  }
+  if (payload.mangaGenre) {
+    args.push('--genre', quoteArg_(payload.mangaGenre));
   }
   if (payload.audience) {
     args.push('--audience', quoteArg_(payload.audience));
