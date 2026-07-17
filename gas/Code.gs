@@ -12,17 +12,22 @@ function handleApiRequest_(e, method) {
   try {
     const request = parseApiRequest_(e, method);
     assertClientKey_(request);
+    assertAuthorized_(request);
     return jsonResponse_({
       ok: true,
       data: dispatchApiAction_(request)
     });
   } catch (error) {
-    return jsonResponse_({
+    const payload = {
       ok: false,
       error: {
         message: error && error.message ? error.message : String(error)
       }
-    });
+    };
+    if (error && error.code) {
+      payload.error.code = error.code;
+    }
+    return jsonResponse_(payload);
   }
 }
 
@@ -38,6 +43,9 @@ function parseApiRequest_(e, method) {
     method: method,
     action: String(body.action || params.action || '').trim(),
     clientKey: String(body.clientKey || params.clientKey || '').trim(),
+    idToken: String(body.idToken || '').trim(),
+    // GET(クエリ)とPOST(JSONボディ)のどちらでも同じ引数参照にする
+    args: Object.assign({}, params, body),
     params: params,
     body: body
   };
@@ -49,13 +57,13 @@ function dispatchApiAction_(request) {
       return getPresentationsMeta(isRefreshRequest_(request));
 
     case 'getFirstThumbnail':
-      return getPresentationFirstThumbnail(request.params.presentationId);
+      return getPresentationFirstThumbnail(request.args.presentationId);
 
     case 'getPageWindow':
       return getPresentationPageWindow(
-        request.params.presentationId,
-        request.params.startIndex,
-        request.params.count
+        request.args.presentationId,
+        request.args.startIndex,
+        request.args.count
       );
 
     case 'requestGeneration':
