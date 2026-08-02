@@ -13,9 +13,11 @@ function requestSlideGeneration(input) {
     throw new Error('SLACK_COMPLETION_CHANNEL_ID is not set.');
   }
 
-  let slideTs = '';
-  if (payload.slides) {
-    slideTs = postSlackText_(token, channelId, buildSlideGenerationMessage_(payload, trackingId));
+  // Queue asynchronous video/manga work before starting the slides command.
+  // A later slides failure must not prevent these requests from being accepted.
+  let videoTs = '';
+  if (payload.video) {
+    videoTs = postSlackText_(token, channelId, buildVideoGenerationCommand_(payload));
   }
 
   let mangaTs = '';
@@ -23,10 +25,16 @@ function requestSlideGeneration(input) {
     mangaTs = postSlackText_(token, channelId, buildMangaGenerationCommand_(payload));
   }
 
+  let slideTs = '';
+  if (payload.slides) {
+    slideTs = postSlackText_(token, channelId, buildSlideGenerationMessage_(payload, trackingId));
+  }
+
   return {
     trackingId: trackingId,
     slackTs: slideTs,
-    mangaSlackTs: mangaTs
+    mangaSlackTs: mangaTs,
+    videoSlackTs: videoTs
   };
 }
 
@@ -68,11 +76,12 @@ function normalizeGenerationPayload_(input) {
     ? true
     : Boolean(payload.slides);
   const manga = Boolean(payload.manga);
+  const video = Boolean(payload.video);
   const mangaArtStyle = String(payload.mangaArtStyle || '').trim().toUpperCase();
   const mangaTreatment = String(payload.mangaTreatment || '').trim().toUpperCase();
   const mangaGenre = String(payload.mangaGenre || '').trim();
 
-  if (!slides && !manga) {
+  if (!slides && !manga && !video) {
     throw new Error('Select at least one generation target.');
   }
   if (urls.length && researchPrompt) {
@@ -80,6 +89,9 @@ function normalizeGenerationPayload_(input) {
   }
   if (!urls.length && !researchPrompt) {
     throw new Error('Enter at least one URL or a research prompt.');
+  }
+  if (video && urls.length !== 1) {
+    throw new Error('Video generation requires exactly one URL.');
   }
   if (urls.length > 3) {
     throw new Error('URLs are limited to 3 items.');
@@ -109,6 +121,7 @@ function normalizeGenerationPayload_(input) {
     pages: pages,
     slides: slides,
     manga: manga,
+    video: video,
     mangaArtStyle: mangaArtStyle,
     mangaTreatment: mangaTreatment,
     mangaGenre: mangaGenre
@@ -137,6 +150,17 @@ function buildSlideGenerationCommand_(payload) {
   }
   if (payload.pages) {
     args.push('--pages', payload.pages);
+  }
+  return args.join(' ');
+}
+
+function buildVideoGenerationCommand_(payload) {
+  const args = ['[video-generate]', '--url', payload.urls[0]];
+  if (payload.audience) {
+    args.push('--audience', quoteArg_(payload.audience));
+  }
+  if (payload.focus) {
+    args.push('--focus', quoteArg_(payload.focus));
   }
   return args.join(' ');
 }
